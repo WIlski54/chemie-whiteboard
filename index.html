@@ -417,6 +417,7 @@
             color: white;
             cursor: pointer;
             transition: all 0.2s;
+            flex-shrink: 0;
         }
 
         .equipment-btn:hover {
@@ -630,8 +631,6 @@
 
     <script>
         // API Configuration
-        // HINWEIS: Die API_URL wird nur noch für /create und /join benötigt.
-        // Du kannst das alte Backend dafür weiterlaufen lassen oder diese Logik in dein neues FastAPI-Backend integrieren.
         const API_URL = 'https://chemie-whiteboard-backend.onrender.com/api';
         
         // Session Data
@@ -642,7 +641,6 @@
             isCreator: false
         };
         
-        // NEU: WebSocket-Variable
         let websocket = null;
 
         // Tab Switching
@@ -659,10 +657,9 @@
             }
         }
 
-        // Create Room (bleibt unverändert, nutzt weiterhin HTTP POST)
+        // Create Room
         async function createRoom(event) {
             event.preventDefault();
-            
             const username = document.getElementById('createName').value;
             const roomName = document.getElementById('roomName').value;
             
@@ -672,7 +669,6 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ room_name: roomName })
                 });
-                
                 const data = await response.json();
                 
                 if (data.success) {
@@ -681,7 +677,6 @@
                     sessionData.isCreator = true;
                     
                     await joinCreatedRoom(data.room_id, username);
-                    
                     alert(`Raum erstellt! Raum-ID: ${data.room_id}\n\nGib diese ID an deine Schüler weiter.`);
                 } else {
                     alert('Fehler beim Erstellen des Raums.');
@@ -699,8 +694,7 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         room_id: roomId,
-                        username: username,
-                        color: '#2563eb'
+                        username: username
                     })
                 });
                 const data = await response.json();
@@ -713,10 +707,9 @@
             }
         }
 
-        // Join Room (bleibt unverändert, nutzt weiterhin HTTP POST)
+        // Join Room
         async function joinRoom(event) {
             event.preventDefault();
-            
             const username = document.getElementById('joinName').value;
             const roomId = document.getElementById('roomId').value;
             
@@ -726,11 +719,9 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         room_id: roomId,
-                        username: username,
-                        color: '#22c55e'
+                        username: username
                     })
                 });
-                
                 const data = await response.json();
                 
                 if (data.success) {
@@ -743,7 +734,6 @@
                         app.state.placedItems = data.room_state.items || [];
                         app.state.connections = data.room_state.connections || [];
                     }
-                    
                     startWhiteboard();
                 } else {
                     alert(data.error || 'Fehler beim Beitreten.');
@@ -754,7 +744,7 @@
             }
         }
 
-        // Start Whiteboard (angepasst für WebSockets)
+        // Start Whiteboard
         function startWhiteboard() {
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('app').classList.add('active');
@@ -766,37 +756,29 @@
             app.render();
             app.updateUI();
             
-            // NEU: Starte die WebSocket-Verbindung anstatt Polling
             startWebSocketConnection();
         }
         
-        // NEU: Funktion zum Aufbau der WebSocket-Verbindung
         function startWebSocketConnection() {
-            // WICHTIG: Ersetze 'dein-backend-name.onrender.com' mit dem tatsächlichen Namen deines Render Web Service
             const ws_url = `wss://chemie-whiteboard-backend.onrender.com/ws/${sessionData.roomId}`;
             websocket = new WebSocket(ws_url);
 
             websocket.onopen = (event) => {
                 console.log("WebSocket-Verbindung erfolgreich hergestellt.");
-                // Lade den initialen Zustand, falls nötig (oder sende eine "Hallo"-Nachricht)
             };
 
-            // Diese Funktion wird aufgerufen, wenn eine Nachricht vom Server kommt
             websocket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                
-                // Aktualisiere den Zustand der App mit den empfangenen Daten
                 if (data.items !== undefined && data.connections !== undefined) {
                     app.state.placedItems = data.items;
                     app.state.connections = data.connections;
-                    app.render(); // Zeichne das Canvas neu, um die Änderungen anzuzeigen
+                    app.render();
                     app.updateUI();
                 }
             };
 
             websocket.onclose = (event) => {
                 console.log("WebSocket-Verbindung geschlossen.");
-                // Hier könntest du eine Logik implementieren, um zu versuchen, die Verbindung wiederherzustellen.
             };
 
             websocket.onerror = (error) => {
@@ -805,40 +787,16 @@
             };
         }
 
-        // ENTFERNT: Die alte Polling-Funktion wird nicht mehr benötigt.
-        /*
-        function startPolling() {
-            pollingInterval = setInterval(async () => {
-                try {
-                    const response = await fetch(`${API_URL}/room/${sessionData.roomId}/state`);
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        app.state.placedItems = data.state.items || [];
-                        app.state.connections = data.state.connections || [];
-                        app.render();
-                    }
-                } catch (error) {
-                    console.error('Polling error:', error);
-                }
-            }, 2000); // Poll every 2 seconds
-        }
-        */
-
-        // ÜBERARBEITET: Sendet Updates jetzt über den WebSocket
         function sendUpdate() {
-            // Stelle sicher, dass der WebSocket verbunden ist
             if (!sessionData.roomId || !websocket || websocket.readyState !== WebSocket.OPEN) {
                 return;
             }
             
-            // Erstelle das Datenpaket mit dem aktuellen Zustand
             const payload = JSON.stringify({
                 items: app.state.placedItems,
                 connections: app.state.connections
             });
 
-            // Sende die Daten an den Server
             websocket.send(payload);
         }
 
@@ -864,11 +822,50 @@
             },
 
             equipment: [
-                { id: 'beaker', name: 'Becherglas', svg: `<svg viewBox="0 0 80 80"><rect x="20" y="15" width="40" height="50" fill="none" stroke="#333" stroke-width="2"/><line x1="15" y1="15" x2="25" y2="15" stroke="#333" stroke-width="2"/><line x1="55" y1="15" x2="65" y2="15" stroke="#333" stroke-width="2"/><line x1="20" y1="65" x2="60" y2="65" stroke="#333" stroke-width="3"/><text x="40" y="45" text-anchor="middle" font-size="12" fill="#666">mL</text></svg>` },
-                { id: 'flask', name: 'Erlenmeyerkolben', svg: `<svg viewBox="0 0 80 80"><line x1="35" y1="10" x2="35" y2="30" stroke="#333" stroke-width="2"/><line x1="45" y1="10" x2="45" y2="30" stroke="#333" stroke-width="2"/><path d="M 35 30 L 20 60 L 60 60 L 45 30 Z" fill="none" stroke="#333" stroke-width="2"/><line x1="20" y1="60" x2="60" y2="60" stroke="#333" stroke-width="3"/></svg>` },
-                { id: 'burner', name: 'Brenner', svg: `<svg viewBox="0 0 80 80"><rect x="30" y="50" width="20" height="15" fill="#666" stroke="#333" stroke-width="2"/><circle cx="40" cy="35" r="8" fill="#ff6b00" opacity="0.7"/><circle cx="40" cy="35" r="5" fill="#ffaa00"/><line x1="25" y1="65" x2="55" y2="65" stroke="#333" stroke-width="3"/></svg>` },
-                { id: 'test-tube', name: 'Reagenzglas', svg: `<svg viewBox="0 0 80 80"><rect x="32" y="15" width="16" height="45" rx="8" fill="none" stroke="#333" stroke-width="2"/><line x1="30" y1="15" x2="50" y2="15" stroke="#333" stroke-width="2"/></svg>` },
-                { id: 'stand', name: 'Stativ', svg: `<svg viewBox="0 0 80 80"><line x1="40" y1="10" x2="40" y2="60" stroke="#555" stroke-width="3"/><rect x="25" y="60" width="30" height="5" fill="#555"/><line x1="40" y1="25" x2="60" y2="25" stroke="#555" stroke-width="2"/><circle cx="60" cy="25" r="3" fill="#555"/></svg>` }
+                // Halterungen & Stative
+                { id: 'stand', name: 'Stativ', svg: `<svg viewBox="0 0 80 80"><line x1="40" y1="10" x2="40" y2="70" stroke="#555" stroke-width="3"/><rect x="20" y="70" width="40" height="5" fill="#555"/></svg>` },
+                { id: 'support-ring', name: 'Stativring', svg: `<svg viewBox="0 0 80 80"><circle cx="45" cy="40" r="20" fill="none" stroke="#333" stroke-width="2"/><rect x="65" y="38" width="15" height="4" fill="#555"/><rect x="70" y="32" width="5" height="16" fill="#777"/></svg>` },
+                { id: 'clamp', name: 'Stativklemme', svg: `<svg viewBox="0 0 80 80"><path d="M 50 30 C 60 25, 60 55, 50 50 L 20 50 L 20 30 Z" fill="none" stroke="#333" stroke-width="2"/><rect x="68" y="38" width="12" height="4" fill="#555"/><rect x="72" y="32" width="4" height="16" fill="#777"/></svg>` },
+                { id: 'test-tube-rack', name: 'Reagenzglasgestell', svg: `<svg viewBox="0 0 80 80"><rect x="10" y="30" width="60" height="20" rx="2" fill="#a3a3a3" stroke="#333" stroke-width="2"/><circle cx="25" cy="40" r="5" fill="white"/><circle cx="40" cy="40" r="5" fill="white"/><circle cx="55" cy="40" r="5" fill="white"/><line x1="10" y1="50" x2="10" y2="60" stroke="#333" stroke-width="2"/><line x1="70" y1="50" x2="70" y2="60" stroke="#333" stroke-width="2"/><rect x="5" y="60" width="70" height="5" fill="#a3a3a3" stroke="#333" stroke-width="2"/></svg>` },
+
+                // Erhitzen
+                { id: 'burner', name: 'Gasbrenner', svg: `<svg viewBox="0 0 80 80"><rect x="30" y="50" width="20" height="15" fill="#666" stroke="#333" stroke-width="2"/><circle cx="40" cy="35" r="8" fill="#ff6b00" opacity="0.7"/><circle cx="40" cy="35" r="5" fill="#ffaa00"/><line x1="25" y1="65" x2="55" y2="65" stroke="#333" stroke-width="3"/></svg>` },
+                { id: 'tripod', name: 'Dreifuß', svg: `<svg viewBox="0 0 80 80"><circle cx="40" cy="25" r="18" fill="none" stroke="#333" stroke-width="2.5"/><line x1="40" y1="25" x2="20" y2="65" stroke="#333" stroke-width="2.5"/><line x1="28" y1="20" x2="40" y2="65" stroke="#333" stroke-width="2.5"/><line x1="52" y1="20" x2="60" y2="65" stroke="#333" stroke-width="2.5"/></svg>` },
+                { id: 'wire-gauze', name: 'Mineralfasernetz', svg: `<svg viewBox="0 0 80 80"><rect x="20" y="20" width="40" height="40" fill="none" stroke="#888" stroke-width="1"/><path d="M 20 20 L 60 60 M 60 20 L 20 60" stroke="#888" stroke-width="1" stroke-dasharray="4"/><circle cx="40" cy="40" r="12" fill="#e5e5e5" stroke="#333" stroke-width="1.5"/></svg>` },
+                { id: 'pipeclay-triangle', name: 'Tondreieck', svg: `<svg viewBox="0 0 80 80"><path d="M 40 15 L 65 55 L 15 55 Z" fill="none" stroke="#333" stroke-width="2.5"/><circle cx="40" cy="15" r="4" fill="#e5e5e5"/><circle cx="65" cy="55" r="4" fill="#e5e5e5"/><circle cx="15" cy="55" r="4" fill="#e5e5e5"/></svg>` },
+
+                // Glasgeräte
+                { id: 'beaker', name: 'Becherglas', svg: `<svg viewBox="0 0 80 80"><path d="M 20 15 L 20 65 L 60 65 L 60 15" fill="none" stroke="#333" stroke-width="2"/><line x1="15" y1="15" x2="25" y2="15" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'erlenmeyer-flask', name: 'Erlenmeyerkolben', svg: `<svg viewBox="0 0 80 80"><path d="M 35 15 L 35 30 L 20 65 L 60 65 L 45 30 L 45 15" fill="none" stroke="#333" stroke-width="2"/><line x1="33" y1="15" x2="47" y2="15" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'test-tube', name: 'Reagenzglas', svg: `<svg viewBox="0 0 80 80"><path d="M 32 15 L 32 55 A 8 8 0 0 0 48 55 L 48 15 Z" fill="none" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'round-bottom-flask', name: 'Rundkolben', svg: `<svg viewBox="0 0 80 80"><rect x="35" y="10" width="10" height="25" fill="none" stroke="#333" stroke-width="2"/><path d="M 30,35 A 20,20 0 1,1 50,35" fill="none" stroke="#333" stroke-width="2"/><line x1="33" y1="10" x2="47" y2="10" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'florence-flask', name: 'Stehkolben', svg: `<svg viewBox="0 0 80 80"><rect x="35" y="10" width="10" height="25" fill="none" stroke="#333" stroke-width="2"/><path d="M 30 55 L 30 35 A 20 20 0 0 1 50 35 L 50 55" fill="none" stroke="#333" stroke-width="2"/><line x1="30" y1="55" x2="50" y2="55" stroke="#333" stroke-width="2.5"/></svg>`},
+                { id: 'graduated-cylinder', name: 'Messzylinder', svg: `<svg viewBox="0 0 80 80"><path d="M 30 15 L 30 65 L 50 65 L 50 15" fill="none" stroke="#333" stroke-width="2"/><line x1="25" y1="65" x2="55" y2="65" stroke="#333" stroke-width="3"/><line x1="30" y1="25" x2="40" y2="25" stroke="#333" stroke-width="1"/><line x1="30" y1="35" x2="40" y2="35" stroke="#333" stroke-width="1"/><line x1="30" y1="45" x2="40" y2="45" stroke="#333" stroke-width="1"/><line x1="30" y1="55" x2="40" y2="55" stroke="#333" stroke-width="1"/></svg>` },
+                { id: 'gas-jar', name: 'Standzylinder', svg: `<svg viewBox="0 0 80 80"><path d="M 25 15 L 25 65 L 55 65 L 55 15" fill="none" stroke="#333" stroke-width="2"/><line x1="22" y1="15" x2="58" y2="15" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'funnel', name: 'Trichter', svg: `<svg viewBox="0 0 80 80"><path d="M 15 15 L 65 15 L 45 45 L 35 45 Z" fill="none" stroke="#333" stroke-width="2"/><rect x="37" y="45" width="6" height="20" fill="none" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'filtering-flask', name: 'Saugflasche', svg: `<svg viewBox="0 0 80 80"><path d="M 35 15 L 35 30 L 20 65 L 60 65 L 45 30 L 45 15" fill="none" stroke="#333" stroke-width="2"/><line x1="33" y1="15" x2="47" y2="15" stroke="#333" stroke-width="2"/><rect x="10" y="35" width="10" height="6" fill="none" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'gas-washing-bottle', name: 'Gaswaschflasche', svg: `<svg viewBox="0 0 80 80"><rect x="25" y="15" width="30" height="50" rx="5" fill="none" stroke="#333" stroke-width="2"/><line x1="35" y1="15" x2="35" y2="5" stroke="#333" stroke-width="2"/><line x1="45" y1="15" x2="45" y2="5" stroke="#333" stroke-width="2"/><line x1="35" y1="15" x2="35" y2="50" stroke="#333" stroke-width="2" stroke-dasharray="2 2"/></svg>` },
+                { id: 'wash-bottle', name: 'Spritzflasche', svg: `<svg viewBox="0 0 80 80"><path d="M 25 20 C 25 10, 55 10, 55 20 L 55 60 C 55 70, 25 70, 25 60 Z" fill="none" stroke="#333" stroke-width="2"/><path d="M 40 20 L 40 10 L 60 10 L 60 40" fill="none" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'reagent-bottle', name: 'Säurekapfenflasche', svg: `<svg viewBox="0 0 80 80"><rect x="30" y="10" width="20" height="5" fill="none" stroke="#333" stroke-width="2"/><rect x="25" y="15" width="30" height="10" fill="none" stroke="#333" stroke-width="2"/><rect x="20" y="25" width="40" height="40" rx="5" fill="none" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'pneumatic-trough', name: 'Pneumatische Wanne', svg: `<svg viewBox="0 0 80 80"><path d="M 5 25 L 15 65 L 65 65 L 75 25 Z" fill="none" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'u-tube', name: 'U-Rohr', svg: `<svg viewBox="0 0 80 80"><path d="M 25 20 L 25 45 A 15 15 0 0 0 55 45 L 55 20" fill="none" stroke="#333" stroke-width="2"/></svg>`},
+                
+                // Destillation
+                { id: 'liebig-condenser', name: 'Liebigkühler', svg: `<svg viewBox="0 0 80 80"><rect x="5" y="35" width="70" height="10" fill="none" stroke="#333" stroke-width="2"/><rect x="10" y="30" width="60" height="20" fill="none" stroke="#333" stroke-width="2"/><line x1="20" y1="30" x2="25" y2="20" stroke="#333" stroke-width="2"/><line x1="60" y1="50" x2="55" y2="60" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'burette', name: 'Bürette', svg: `<svg viewBox="0 0 80 80"><rect x="38" y="5" width="4" height="60" fill="none" stroke="#333" stroke-width="2"/><line x1="35" y1="65" x2="45" y2="65" stroke="#333" stroke-width="2"/><line x1="45" y1="62" x2="55" y2="62" stroke="#333" stroke-width="2"/><line x1="30" y1="15" x2="38" y2="15" stroke="#333" stroke-width="1"/><line x1="30" y1="25" x2="38" y2="25" stroke="#333" stroke-width="1"/><line x1="30" y1="35" x2="38" y2="35" stroke="#333" stroke-width="1"/><line x1="30" y1="45" x2="38" y2="45" stroke="#333" stroke-width="1"/><line x1="30" y1="55" x2="38" y2="55" stroke="#333" stroke-width="1"/></svg>` },
+                { id: 'pipette', name: 'Pipette', svg: `<svg viewBox="0 0 80 80"><rect x="38" y="15" width="4" height="55" fill="none" stroke="#333" stroke-width="2"/><path d="M 30 15 C 30 5, 50 5, 50 15 Z" fill="none" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'gas-syringe', name: 'Kolbenprober', svg: `<svg viewBox="0 0 80 80"><rect x="5" y="30" width="50" height="20" fill="none" stroke="#333" stroke-width="2"/><rect x="55" y="35" width="20" height="10" fill="#888"/><line x1="15" y1="30" x2="15" y2="25" stroke="#333" stroke-width="1.5"/><line x1="25" y1="30" x2="25" y2="25" stroke="#333" stroke-width="1.5"/><line x1="35" y1="30" x2="35" y2="25" stroke="#333" stroke-width="1.5"/><line x1="45" y1="30" x2="45" y2="25" stroke="#333" stroke-width="1.5"/><rect x="10" y="32" width="10" height="16" fill="#aaa" stroke="#333" stroke-width="1.5"/></svg>`},
+
+                // Porzellan & Sonstiges
+                { id: 'evaporating-dish', name: 'Abdampfschale', svg: `<svg viewBox="0 0 80 80"><path d="M 15 50 Q 40 60, 65 50 L 60 30 L 20 30 Z" fill="none" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'crucible', name: 'Porzellantiegel', svg: `<svg viewBox="0 0 80 80"><path d="M 25 55 L 20 25 L 60 25 L 55 55 Z" fill="none" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'mortar-pestle', name: 'Mörser & Pistill', svg: `<svg viewBox="0 0 80 80"><path d="M 20 60 Q 40 70, 60 60 L 55 40 L 25 40 Z" fill="#e5e5e5" stroke="#333" stroke-width="2"/><path d="M 50 40 L 55 20 L 65 25 L 60 40 Z" fill="#e5e5e5" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'watch-glass', name: 'Uhrglas', svg: `<svg viewBox="0 0 80 80"><path d="M 10 40 Q 40 55, 70 40" fill="none" stroke="#333" stroke-width="2" /></svg>` },
+                { id: 'spatula', name: 'Spatel', svg: `<svg viewBox="0 0 80 80"><rect x="5" y="38" width="50" height="4" fill="#aaa"/><path d="M 55 40 Q 75 40, 75 35 L 75 45 Q 75 40, 55 40" fill="#aaa"/></svg>` },
+                { id: 'tongs', name: 'Tiegelzange', svg: `<svg viewBox="0 0 80 80"><path d="M 10 20 Q 40 40, 70 20" fill="none" stroke="#333" stroke-width="2"/><path d="M 10 60 Q 40 40, 70 60" fill="none" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'deflagrating-spoon', name: 'Verbrennungslöffel', svg: `<svg viewBox="0 0 80 80"><line x1="5" y1="40" x2="60" y2="40" stroke="#333" stroke-width="2"/><circle cx="65" cy="40" r="8" fill="none" stroke="#333" stroke-width="2"/></svg>`},
+                { id: 'thermometer', name: 'Thermometer', svg: `<svg viewBox="0 0 80 80"><rect x="37" y="10" width="6" height="50" rx="3" fill="none" stroke="#333" stroke-width="2"/><circle cx="40" cy="65" r="8" fill="none" stroke="#333" stroke-width="2"/><circle cx="40" cy="65" r="5" fill="#ef4444"/><rect x="38" y="30" width="4" height="30" fill="#ef4444"/></svg>` },
+                { id: 'goggles', name: 'Schutzbrille', svg: `<svg viewBox="0 0 80 80"><path d="M 10 30 L 30 30 A 10 10 0 0 1 30 50 L 10 50 Z" fill="none" stroke="#333" stroke-width="2"/><path d="M 70 30 L 50 30 A 10 10 0 0 0 50 50 L 70 50 Z" fill="none" stroke="#333" stroke-width="2"/><line x1="40" y1="40" x2="50" y2="40" stroke="#333" stroke-width="2"/></svg>` }
             ],
 
             init() {
@@ -1367,6 +1364,4 @@
         };
     </script>
 </body>
-
 </html>
-
