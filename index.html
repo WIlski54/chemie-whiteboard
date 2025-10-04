@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chemie Whiteboard - Kollaborativ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* Login Screen */
+        .login-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .login-container {
+            background: white;
+            padding: 3rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .login-container h1 {
+            color: #2563eb;
+            margin-bottom: 0.5rem;
+        }
+
+        .login-container p {
+            color: #6b7280;
+            margin-bottom: 2rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 1rem;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 1rem;
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            color: #2563eb;
+            border-bottom-color: #2563eb;
+            font-weight: 600;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #374151;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 1rem;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .info-box {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #eff6ff;
+            border-left: 4px solid #2563eb;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            color: #1e40af;
+        }
+
+        /* App Container */
+        .app {
+            display: none;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #f9fafb;
+        }
+
+        .app.active {
+            display: flex;
+        }
+
+        .header {
+            background-color: #2563eb;
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .room-info {
+            font-size: 0.875rem;
+            opacity: 0.9;
+        }
+
+        .header h1 {
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            transition: background-color 0.2s;
+        }
+
+        .btn:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .btn-yellow { background-color: #eab308; color: white; }
+        .btn-yellow:hover:not(:disabled) { background-color: #ca8a04; }
+        
+        .btn-purple { background-color: #a855f7; color: white; }
+        .btn-purple:hover:not(:disabled) { background-color: #9333ea; }
+        
+        .btn-pink { background-color: #ec4899; color: white; }
+        .btn-pink:hover:not(:disabled) { background-color: #db2777; }
+        
+        .btn-green { background-color: #22c55e; color: white; }
+        .btn-green:hover:not(:disabled) { background-color: #16a34a; }
+        
+        .btn-orange { background-color: #f97316; color: white; }
+        .btn-orange:hover:not(:disabled) { background-color: #ea580c; }
+        
+        .btn-red { background-color: #ef4444; color: white; }
+        .btn-red:hover:not(:disabled) { background-color: #dc2626; }
+        
+        .btn-gray { background-color: #d1d5db; color: #1f2937; }
+        .btn-gray:hover { background-color: #9ca3af; }
+
+        .btn-white {
+            background-color: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .btn-white:hover {
+            background-color: rgba(255,255,255,0.3);
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            background-color: white;
+            border: 4px solid #e5e7eb;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .canvas-svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .items-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+        }
+
+        .item {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s;
+            cursor: grab;
+        }
+
+        .item.selected {
+            box-shadow: 0 0 0 4px #2563eb;
+            border-radius: 4px;
+        }
+
+        .item.dragging {
+            opacity: 0.8;
+            cursor: grabbing;
+        }
+
+        .item-content {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .resize-handle {
+            position: absolute;
+            bottom: -8px;
+            right: -8px;
+            width: 32px;
+            height: 32px;
+            background-color: #2563eb;
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: nwse-resize;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        .resize-handle:hover {
+            background-color: #1d4ed8;
+            transform: scale(1.1);
+        }
+
+        .label {
+            position: absolute;
+            background-color: #fef3c7;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            white-space: nowrap;
+            border: 1px solid #fcd34d;
+            transform: translateX(-50%);
+            left: 50%;
+            pointer-events: none;
+        }
+
+        .instruction {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.125rem;
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        .instruction-gray { color: #9ca3af; }
+        .instruction-blue { color: #2563eb; font-weight: bold; }
+        .instruction-green { color: #16a34a; font-weight: bold; }
+
+        .status-badge {
+            position: absolute;
+            top: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        .status-green { background-color: #22c55e; }
+        .status-purple { background-color: #a855f7; }
+        .status-blue { background-color: #2563eb; }
+
+        .control-panel {
+            background-color: #f3f4f6;
+            padding: 1rem;
+            border-top: 4px solid #d1d5db;
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 1.5rem;
+            border: none;
+            border-radius: 0.75rem;
+            font-size: 1.125rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .control-btn-blue { background-color: #3b82f6; color: white; }
+        .control-btn-blue:hover { background-color: #2563eb; }
+        
+        .control-btn-green { background-color: #22c55e; color: white; }
+        .control-btn-green:hover { background-color: #16a34a; }
+        
+        .control-btn-red { background-color: #ef4444; color: white; }
+        .control-btn-red:hover { background-color: #dc2626; }
+
+        .label-input-panel {
+            background-color: #f3f4f6;
+            padding: 1rem;
+            border-top: 4px solid #d1d5db;
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .label-input {
+            flex: 1;
+            padding: 1rem;
+            font-size: 1.125rem;
+            border: 2px solid #d1d5db;
+            border-radius: 0.5rem;
+        }
+
+        .equipment-palette {
+            background-color: #1f2937;
+            padding: 1rem;
+            overflow-x: auto;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .equipment-btn {
+            min-width: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem;
+            border: none;
+            border-radius: 0.75rem;
+            background-color: #374151;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .equipment-btn:hover {
+            background-color: #4b5563;
+        }
+
+        .equipment-btn.selected {
+            background-color: #3b82f6;
+            transform: scale(1.1);
+        }
+
+        .equipment-icon {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 0.5rem;
+        }
+
+        .equipment-name {
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+
+        .modal {
+            background-color: white;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            max-width: 28rem;
+            margin: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal h2 {
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            color: #1f2937;
+        }
+
+        .modal p {
+            color: #4b5563;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .connection-line:hover {
+            stroke: #ef4444 !important;
+            stroke-width: 5 !important;
+        }
+
+        .sync-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.5rem;
+            background: rgba(255,255,255,0.2);
+            font-size: 0.875rem;
+        }
+
+        .sync-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-screen" id="loginScreen">
+        <div class="login-container">
+            <h1>🧪 Chemie Whiteboard</h1>
+            <p>Kollaboratives Arbeiten in Echtzeit</p>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('create')">Raum erstellen</button>
+                <button class="tab" onclick="switchTab('join')">Raum beitreten</button>
+            </div>
+
+            <div class="tab-content active" id="createTab">
+                <form onsubmit="createRoom(event)">
+                    <div class="form-group">
+                        <label>Dein Name</label>
+                        <input type="text" id="createName" placeholder="z.B. Herr Müller" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Raum-Name</label>
+                        <input type="text" id="roomName" placeholder="z.B. Chemie 10a" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Raum erstellen</button>
+                    <div class="info-box">
+                        Als Lehrer erstellst du einen neuen Raum. Du erhältst eine Raum-ID, die du deinen Schülern gibst.
+                    </div>
+                </form>
+            </div>
+
+            <div class="tab-content" id="joinTab">
+                <form onsubmit="joinRoom(event)">
+                    <div class="form-group">
+                        <label>Dein Name</label>
+                        <input type="text" id="joinName" placeholder="z.B. Max Mustermann" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Raum-ID</label>
+                        <input type="text" id="roomId" placeholder="z.B. a3b8c9d2" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Raum beitreten</button>
+                    <div class="info-box">
+                        Gib die Raum-ID ein, die dir dein Lehrer gegeben hat.
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="app" id="app">
+        <div class="header">
+            <div class="header-left">
+                <h1>Versuchsaufbau</h1>
+                <div class="room-info">
+                    <div id="roomInfoDisplay"></div>
+                    <div class="sync-indicator">
+                        <div class="sync-dot"></div>
+                        <span>Synchronisiert</span>
+                    </div>
+                </div>
+            </div>
+            <div class="header-buttons">
+                <button class="btn btn-white" onclick="showRoomInfo()">Raum-Info</button>
+                <button class="btn btn-yellow" onclick="app.triggerFileInput()">Laden</button>
+                <button class="btn btn-purple" id="saveBtn" onclick="app.saveSetup()">Speichern</button>
+                <button class="btn btn-pink" id="pdfBtn" onclick="app.exportToPDF()">
+                    <span id="pdfBtnText">PDF Export</span>
+                </button>
+                <button class="btn btn-green" id="connectBtn" onclick="app.startConnectionMode()">Verbinden</button>
+                <button class="btn btn-red" onclick="app.showClearConfirm()">Alles löschen</button>
+            </div>
+        </div>
+
+        <input type="file" id="fileInput" accept=".json" class="hidden">
+
+        <div class="canvas-container" id="canvas">
+            <svg class="canvas-svg" id="connectionsSvg"></svg>
+            <div class="items-container" id="itemsContainer"></div>
+            
+            <div id="instruction" class="instruction instruction-gray">
+                Wähle ein Gerät und tippe auf die Fläche
+            </div>
+            <div id="statusBadge" class="status-badge hidden"></div>
+        </div>
+
+        <div id="controlPanel" class="control-panel hidden">
+            <button class="control-btn control-btn-blue" onclick="app.rotateItem()">
+                Drehen
+            </button>
+            <button class="control-btn control-btn-green" onclick="app.addLabel()">
+                Beschriften
+            </button>
+            <button class="control-btn control-btn-red" onclick="app.deleteItem()">
+                Löschen
+            </button>
+        </div>
+
+        <div id="labelPanel" class="label-input-panel hidden">
+            <input type="text" id="labelInput" class="label-input" placeholder="Beschriftung eingeben...">
+            <button class="control-btn control-btn-green" onclick="app.saveLabel()">OK</button>
+            <button class="control-btn control-btn-gray" onclick="app.cancelLabel()">✕</button>
+        </div>
+
+        <div class="equipment-palette" id="palette"></div>
+
+        <div id="clearModal" class="modal-overlay hidden">
+            <div class="modal">
+                <h2>Alle Geräte löschen?</h2>
+                <p>Möchtest du wirklich alle platzierten Geräte vom Canvas entfernen?</p>
+                <div class="modal-buttons">
+                    <button class="btn btn-gray" onclick="app.hideClearConfirm()">Abbrechen</button>
+                    <button class="btn btn-red" onclick="app.clearAll()">Ja, alles löschen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script>
+        // API Configuration
+        // HINWEIS: Die API_URL wird nur noch für /create und /join benötigt.
+        // Du kannst das alte Backend dafür weiterlaufen lassen oder diese Logik in dein neues FastAPI-Backend integrieren.
+        const API_URL = 'https://drwk.pythonanywhere.com/api';
+        
+        // Session Data
+        let sessionData = {
+            roomId: null,
+            userId: null,
+            username: null,
+            isCreator: false
+        };
+        
+        // NEU: WebSocket-Variable
+        let websocket = null;
+
+        // Tab Switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            if (tab === 'create') {
+                document.querySelectorAll('.tab')[0].classList.add('active');
+                document.getElementById('createTab').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab')[1].classList.add('active');
+                document.getElementById('joinTab').classList.add('active');
+            }
+        }
+
+        // Create Room (bleibt unverändert, nutzt weiterhin HTTP POST)
+        async function createRoom(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('createName').value;
+            const roomName = document.getElementById('roomName').value;
+            
+            try {
+                const response = await fetch(`${API_URL}/room/create`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ room_name: roomName })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    sessionData.roomId = data.room_id;
+                    sessionData.username = username;
+                    sessionData.isCreator = true;
+                    
+                    await joinCreatedRoom(data.room_id, username);
+                    
+                    alert(`Raum erstellt! Raum-ID: ${data.room_id}\n\nGib diese ID an deine Schüler weiter.`);
+                } else {
+                    alert('Fehler beim Erstellen des Raums.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Verbindungsfehler. Überprüfe deine Internetverbindung.');
+            }
+        }
+
+        async function joinCreatedRoom(roomId, username) {
+            try {
+                const response = await fetch(`${API_URL}/room/join`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        room_id: roomId,
+                        username: username,
+                        color: '#2563eb'
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    sessionData.userId = data.user_id;
+                    startWhiteboard();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Join Room (bleibt unverändert, nutzt weiterhin HTTP POST)
+        async function joinRoom(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('joinName').value;
+            const roomId = document.getElementById('roomId').value;
+            
+            try {
+                const response = await fetch(`${API_URL}/room/join`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        room_id: roomId,
+                        username: username,
+                        color: '#22c55e'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    sessionData.roomId = roomId;
+                    sessionData.userId = data.user_id;
+                    sessionData.username = username;
+                    sessionData.isCreator = false;
+                    
+                    if (data.room_state) {
+                        app.state.placedItems = data.room_state.items || [];
+                        app.state.connections = data.room_state.connections || [];
+                    }
+                    
+                    startWhiteboard();
+                } else {
+                    alert(data.error || 'Fehler beim Beitreten.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Raum nicht gefunden oder Verbindungsfehler.');
+            }
+        }
+
+        // Start Whiteboard (angepasst für WebSockets)
+        function startWhiteboard() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('app').classList.add('active');
+            
+            document.getElementById('roomInfoDisplay').textContent = 
+                `Raum: ${sessionData.roomId} | ${sessionData.username}`;
+            
+            app.init();
+            app.render();
+            app.updateUI();
+            
+            // NEU: Starte die WebSocket-Verbindung anstatt Polling
+            startWebSocketConnection();
+        }
+        
+        // NEU: Funktion zum Aufbau der WebSocket-Verbindung
+        function startWebSocketConnection() {
+            // WICHTIG: Ersetze 'dein-backend-name.onrender.com' mit dem tatsächlichen Namen deines Render Web Service
+            const ws_url = `wss://dein-backend-name.onrender.com/ws/${sessionData.roomId}`;
+            websocket = new WebSocket(ws_url);
+
+            websocket.onopen = (event) => {
+                console.log("WebSocket-Verbindung erfolgreich hergestellt.");
+                // Lade den initialen Zustand, falls nötig (oder sende eine "Hallo"-Nachricht)
+            };
+
+            // Diese Funktion wird aufgerufen, wenn eine Nachricht vom Server kommt
+            websocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                // Aktualisiere den Zustand der App mit den empfangenen Daten
+                if (data.items !== undefined && data.connections !== undefined) {
+                    app.state.placedItems = data.items;
+                    app.state.connections = data.connections;
+                    app.render(); // Zeichne das Canvas neu, um die Änderungen anzuzeigen
+                    app.updateUI();
+                }
+            };
+
+            websocket.onclose = (event) => {
+                console.log("WebSocket-Verbindung geschlossen.");
+                // Hier könntest du eine Logik implementieren, um zu versuchen, die Verbindung wiederherzustellen.
+            };
+
+            websocket.onerror = (error) => {
+                console.error("WebSocket-Fehler:", error);
+                alert("Es gab einen Fehler mit der Echtzeit-Verbindung.");
+            };
+        }
+
+        // ENTFERNT: Die alte Polling-Funktion wird nicht mehr benötigt.
+        /*
+        function startPolling() {
+            pollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_URL}/room/${sessionData.roomId}/state`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        app.state.placedItems = data.state.items || [];
+                        app.state.connections = data.state.connections || [];
+                        app.render();
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 2000); // Poll every 2 seconds
+        }
+        */
+
+        // ÜBERARBEITET: Sendet Updates jetzt über den WebSocket
+        function sendUpdate() {
+            // Stelle sicher, dass der WebSocket verbunden ist
+            if (!sessionData.roomId || !websocket || websocket.readyState !== WebSocket.OPEN) {
+                return;
+            }
+            
+            // Erstelle das Datenpaket mit dem aktuellen Zustand
+            const payload = JSON.stringify({
+                items: app.state.placedItems,
+                connections: app.state.connections
+            });
+
+            // Sende die Daten an den Server
+            websocket.send(payload);
+        }
+
+        function showRoomInfo() {
+            alert(`Raum-ID: ${sessionData.roomId}\nDein Name: ${sessionData.username}\n\nTeile die Raum-ID mit anderen!`);
+        }
+
+        // Whiteboard App
+        const app = {
+            state: {
+                selectedTool: null,
+                placedItems: [],
+                connections: [],
+                selectedItem: null,
+                isDragging: false,
+                isResizing: false,
+                connectionMode: false,
+                firstDevice: null,
+                dragOffset: { x: 0, y: 0 },
+                initialScale: 1,
+                resizeStartPos: { x: 0, y: 0 },
+                isExporting: false
+            },
+
+            equipment: [
+                { id: 'beaker', name: 'Becherglas', svg: `<svg viewBox="0 0 80 80"><rect x="20" y="15" width="40" height="50" fill="none" stroke="#333" stroke-width="2"/><line x1="15" y1="15" x2="25" y2="15" stroke="#333" stroke-width="2"/><line x1="55" y1="15" x2="65" y2="15" stroke="#333" stroke-width="2"/><line x1="20" y1="65" x2="60" y2="65" stroke="#333" stroke-width="3"/><text x="40" y="45" text-anchor="middle" font-size="12" fill="#666">mL</text></svg>` },
+                { id: 'flask', name: 'Erlenmeyerkolben', svg: `<svg viewBox="0 0 80 80"><line x1="35" y1="10" x2="35" y2="30" stroke="#333" stroke-width="2"/><line x1="45" y1="10" x2="45" y2="30" stroke="#333" stroke-width="2"/><path d="M 35 30 L 20 60 L 60 60 L 45 30 Z" fill="none" stroke="#333" stroke-width="2"/><line x1="20" y1="60" x2="60" y2="60" stroke="#333" stroke-width="3"/></svg>` },
+                { id: 'burner', name: 'Brenner', svg: `<svg viewBox="0 0 80 80"><rect x="30" y="50" width="20" height="15" fill="#666" stroke="#333" stroke-width="2"/><circle cx="40" cy="35" r="8" fill="#ff6b00" opacity="0.7"/><circle cx="40" cy="35" r="5" fill="#ffaa00"/><line x1="25" y1="65" x2="55" y2="65" stroke="#333" stroke-width="3"/></svg>` },
+                { id: 'test-tube', name: 'Reagenzglas', svg: `<svg viewBox="0 0 80 80"><rect x="32" y="15" width="16" height="45" rx="8" fill="none" stroke="#333" stroke-width="2"/><line x1="30" y1="15" x2="50" y2="15" stroke="#333" stroke-width="2"/></svg>` },
+                { id: 'stand', name: 'Stativ', svg: `<svg viewBox="0 0 80 80"><line x1="40" y1="10" x2="40" y2="60" stroke="#555" stroke-width="3"/><rect x="25" y="60" width="30" height="5" fill="#555"/><line x1="40" y1="25" x2="60" y2="25" stroke="#555" stroke-width="2"/><circle cx="60" cy="25" r="3" fill="#555"/></svg>` }
+            ],
+
+            init() {
+                this.renderPalette();
+                this.setupEventListeners();
+                this.updateUI();
+            },
+
+            renderPalette() {
+                const palette = document.getElementById('palette');
+                palette.innerHTML = this.equipment.map(eq => `
+                    <button class="equipment-btn" data-id="${eq.id}" onclick="app.selectTool('${eq.id}')">
+                        <div class="equipment-icon">${eq.svg}</div>
+                        <div class="equipment-name">${eq.name}</div>
+                    </button>
+                `).join('');
+            },
+
+            setupEventListeners() {
+                const canvas = document.getElementById('canvas');
+                const fileInput = document.getElementById('fileInput');
+
+                canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
+                canvas.addEventListener('touchstart', (e) => this.handleCanvasClick(e));
+                
+                document.addEventListener('mousemove', (e) => this.handleMove(e));
+                document.addEventListener('touchmove', (e) => this.handleMove(e), { passive: false });
+                document.addEventListener('mouseup', () => this.handleEnd());
+                document.addEventListener('touchend', () => this.handleEnd());
+
+                fileInput.addEventListener('change', (e) => this.loadSetup(e));
+
+                document.getElementById('labelInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.saveLabel();
+                });
+            },
+
+            selectTool(id) {
+                this.state.selectedTool = id;
+                this.state.selectedItem = null;
+                this.updateUI();
+            },
+
+            handleCanvasClick(e) {
+                if (this.state.isDragging || this.state.isResizing) return;
+
+                const rect = document.getElementById('canvas').getBoundingClientRect();
+                const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
+                const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
+
+                if (!x || !y) return;
+
+                const clickedElement = e.target.closest('.item');
+                const clickedResize = e.target.closest('.resize-handle');
+                
+                if (clickedResize) {
+                    return;
+                } else if (clickedElement) {
+                    const itemId = parseInt(clickedElement.dataset.id);
+                    const item = this.state.placedItems.find(i => i.id === itemId);
+                    
+                    if (this.state.connectionMode && item) {
+                        this.handleConnection(item);
+                    } else if (item) {
+                        this.state.selectedItem = item;
+                        this.state.selectedTool = null;
+                        this.updateUI();
+                    }
+                } else if (this.state.selectedTool) {
+                    this.placeItem(x, y);
+                } else {
+                    this.state.selectedItem = null;
+                    this.updateUI();
+                }
+            },
+
+            placeItem(x, y) {
+                const newItem = {
+                    id: Date.now(),
+                    type: this.state.selectedTool,
+                    x, y,
+                    rotation: 0,
+                    scale: 1,
+                    label: ''
+                };
+                this.state.placedItems.push(newItem);
+                this.state.selectedTool = null;
+                this.state.selectedItem = null;
+                this.render();
+                this.updateUI();
+                sendUpdate();
+            },
+
+            handleConnection(item) {
+                if (!this.state.firstDevice) {
+                    this.state.firstDevice = item;
+                    this.updateUI();
+                } else if (this.state.firstDevice.id !== item.id) {
+                    this.state.connections.push({
+                        id: Date.now(),
+                        from: this.state.firstDevice.id,
+                        to: item.id,
+                        type: 'solid'
+                    });
+                    this.state.firstDevice = null;
+                    this.state.connectionMode = false;
+                    this.render();
+                    this.updateUI();
+                    sendUpdate();
+                }
+            },
+
+            startDrag(e, itemId) {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                const item = this.state.placedItems.find(i => i.id === itemId);
+                if (!item) return;
+
+                const rect = document.getElementById('canvas').getBoundingClientRect();
+                const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
+                const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
+
+                this.state.selectedItem = item;
+                this.state.isDragging = true;
+                this.state.dragOffset = { x: x - item.x, y: y - item.y };
+                this.updateUI();
+            },
+
+            startResize(e, itemId) {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                const item = this.state.placedItems.find(i => i.id === itemId);
+                if (!item) return;
+
+                const rect = document.getElementById('canvas').getBoundingClientRect();
+                const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
+                const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
+
+                this.state.selectedItem = item;
+                this.state.isResizing = true;
+                this.state.initialScale = item.scale || 1;
+                this.state.resizeStartPos = { x, y };
+                this.updateUI();
+            },
+
+            handleMove(e) {
+                if ((!this.state.isDragging && !this.state.isResizing) || !this.state.selectedItem) return;
+
+                const rect = document.getElementById('canvas').getBoundingClientRect();
+                const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
+                const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
+
+                if (this.state.isResizing) {
+                    e.preventDefault();
+                    const deltaX = x - this.state.resizeStartPos.x;
+                    const deltaY = y - this.state.resizeStartPos.y;
+                    const delta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                    const direction = (deltaX + deltaY) > 0 ? 1 : -1;
+                    const scaleFactor = 1 + (direction * delta * 0.003);
+                    let newScale = this.state.initialScale * scaleFactor;
+                    newScale = Math.max(0.5, Math.min(3, newScale));
+                    this.state.selectedItem.scale = newScale;
+                } else if (this.state.isDragging) {
+                    e.preventDefault();
+                    this.state.selectedItem.x = x - this.state.dragOffset.x;
+                    this.state.selectedItem.y = y - this.state.dragOffset.y;
+                }
+
+                this.render();
+                this.updateUI();
+            },
+
+            handleEnd() {
+                if (this.state.isDragging || this.state.isResizing) {
+                    sendUpdate();
+                }
+                this.state.isDragging = false;
+                this.state.isResizing = false;
+                this.updateUI();
+            },
+
+            rotateItem() {
+                if (!this.state.selectedItem) return;
+                this.state.selectedItem.rotation = (this.state.selectedItem.rotation + 90) % 360;
+                this.render();
+                sendUpdate();
+            },
+
+            deleteItem() {
+                if (!this.state.selectedItem) return;
+                this.state.connections = this.state.connections.filter(conn => 
+                    conn.from !== this.state.selectedItem.id && conn.to !== this.state.selectedItem.id
+                );
+                this.state.placedItems = this.state.placedItems.filter(item => 
+                    item.id !== this.state.selectedItem.id
+                );
+                this.state.selectedItem = null;
+                this.render();
+                this.updateUI();
+                sendUpdate();
+            },
+
+            addLabel() {
+                document.getElementById('labelInput').value = this.state.selectedItem?.label || '';
+                document.getElementById('labelPanel').classList.remove('hidden');
+                document.getElementById('controlPanel').classList.add('hidden');
+                document.getElementById('labelInput').focus();
+            },
+
+            saveLabel() {
+                if (!this.state.selectedItem) return;
+                this.state.selectedItem.label = document.getElementById('labelInput').value;
+                this.cancelLabel();
+                this.render();
+                sendUpdate();
+            },
+
+            cancelLabel() {
+                document.getElementById('labelPanel').classList.add('hidden');
+                document.getElementById('controlPanel').classList.remove('hidden');
+            },
+
+            startConnectionMode() {
+                this.state.connectionMode = true;
+                this.state.firstDevice = null;
+                this.state.selectedItem = null;
+                this.state.selectedTool = null;
+                this.updateUI();
+            },
+
+            cancelConnectionMode() {
+                this.state.connectionMode = false;
+                this.state.firstDevice = null;
+                this.updateUI();
+            },
+
+            showClearConfirm() {
+                document.getElementById('clearModal').classList.remove('hidden');
+            },
+
+            hideClearConfirm() {
+                document.getElementById('clearModal').classList.add('hidden');
+            },
+
+            clearAll() {
+                this.state.placedItems = [];
+                this.state.connections = [];
+                this.state.selectedItem = null;
+                this.state.selectedTool = null;
+                this.state.connectionMode = false;
+                this.state.firstDevice = null;
+                this.hideClearConfirm();
+                this.render();
+                this.updateUI();
+                sendUpdate();
+            },
+
+            saveSetup() {
+                const setup = {
+                    version: '1.0',
+                    timestamp: new Date().toISOString(),
+                    items: this.state.placedItems,
+                    connections: this.state.connections
+                };
+                
+                const dataStr = JSON.stringify(setup, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `versuchsaufbau-${Date.now()}.json`;
+                link.click();
+                
+                URL.revokeObjectURL(url);
+            },
+
+            triggerFileInput() {
+                document.getElementById('fileInput').click();
+            },
+
+            loadSetup(event) {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const setup = JSON.parse(e.target.result);
+                        
+                        if (setup.items && Array.isArray(setup.items)) {
+                            this.state.placedItems = setup.items;
+                        }
+                        if (setup.connections && Array.isArray(setup.connections)) {
+                            this.state.connections = setup.connections;
+                        }
+                        
+                        this.state.selectedItem = null;
+                        this.state.selectedTool = null;
+                        this.state.connectionMode = false;
+                        this.state.firstDevice = null;
+                        
+                        this.render();
+                        this.updateUI();
+                        sendUpdate();
+                        alert('Versuchsaufbau erfolgreich geladen!');
+                    } catch (error) {
+                        alert('Fehler beim Laden der Datei.');
+                    }
+                };
+                
+                reader.readAsText(file);
+                event.target.value = '';
+            },
+
+            async exportToPDF() {
+                if (this.state.isExporting) return;
+                
+                this.state.isExporting = true;
+                const pdfBtn = document.getElementById('pdfBtn');
+                const pdfBtnText = document.getElementById('pdfBtnText');
+                pdfBtn.disabled = true;
+                pdfBtnText.textContent = 'Erstelle PDF...';
+                
+                try {
+                    const canvas = await html2canvas(document.getElementById('canvas'), {
+                        backgroundColor: '#ffffff',
+                        scale: 2,
+                        logging: false
+                    });
+                    
+                    const imgData = canvas.toDataURL('image/png');
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF({
+                        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                        unit: 'px',
+                        format: [canvas.width, canvas.height]
+                    });
+                    
+                    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                    
+                    const timestamp = new Date().toLocaleString('de-DE');
+                    pdf.setFontSize(10);
+                    pdf.setTextColor(150);
+                    pdf.text(`Versuchsaufbau - Exportiert am ${timestamp}`, 10, canvas.height - 10);
+                    
+                    pdf.save(`versuchsaufbau-${Date.now()}.pdf`);
+                } catch (error) {
+                    console.error('PDF Export Fehler:', error);
+                    alert('Fehler beim PDF-Export.');
+                } finally {
+                    this.state.isExporting = false;
+                    pdfBtn.disabled = false;
+                    pdfBtnText.textContent = 'PDF Export';
+                }
+            },
+
+            render() {
+                this.renderItems();
+                this.renderConnections();
+            },
+
+            renderItems() {
+                const container = document.getElementById('itemsContainer');
+                container.innerHTML = this.state.placedItems.map(item => {
+                    const equipment = this.equipment.find(e => e.id === item.type);
+                    const size = 80 * (item.scale || 1);
+                    const isSelected = this.state.selectedItem?.id === item.id;
+                    const isDragging = this.state.isDragging && isSelected;
+                    
+                    return `
+                        <div class="item ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}"
+                             style="left: ${item.x - size/2}px; top: ${item.y - size/2}px; width: ${size}px; height: ${size}px;"
+                             data-id="${item.id}"
+                             onmousedown="app.startDrag(event, ${item.id})"
+                             ontouchstart="app.startDrag(event, ${item.id})">
+                            <div class="item-content" style="transform: rotate(${item.rotation}deg);">
+                                ${equipment.svg}
+                            </div>
+                            ${isSelected ? `
+                                <div class="resize-handle"
+                                     onmousedown="app.startResize(event, ${item.id})"
+                                     ontouchstart="app.startResize(event, ${item.id})">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="white">
+                                        <path d="M14 2L2 14M14 8L8 14" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                </div>
+                            ` : ''}
+                            ${item.label ? `<div class="label" style="top: ${size + 8}px;">${item.label}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+            },
+
+            renderConnections() {
+                const svg = document.getElementById('connectionsSvg');
+                svg.innerHTML = this.state.connections.map(conn => {
+                    const fromItem = this.state.placedItems.find(item => item.id === conn.from);
+                    const toItem = this.state.placedItems.find(item => item.id === conn.to);
+                    
+                    if (!fromItem || !toItem) return '';
+                    
+                    return `
+                        <g>
+                            <line x1="${fromItem.x}" y1="${fromItem.y}" 
+                                  x2="${toItem.x}" y2="${toItem.y}" 
+                                  stroke="#2563eb" stroke-width="3" 
+                                  stroke-dasharray="${conn.type === 'dashed' ? '8,4' : 'none'}"/>
+                            <line class="connection-line" 
+                                  x1="${fromItem.x}" y1="${fromItem.y}" 
+                                  x2="${toItem.x}" y2="${toItem.y}" 
+                                  stroke="transparent" stroke-width="20" 
+                                  style="cursor: pointer; pointer-events: auto;"
+                                  onclick="app.deleteConnection(${conn.id})"/>
+                        </g>
+                    `;
+                }).join('');
+            },
+
+            deleteConnection(id) {
+                this.state.connections = this.state.connections.filter(c => c.id !== id);
+                this.render();
+                sendUpdate();
+            },
+
+            updateUI() {
+                document.getElementById('saveBtn').disabled = this.state.placedItems.length === 0;
+                document.getElementById('pdfBtn').disabled = this.state.placedItems.length === 0 || this.state.isExporting;
+                
+                const connectBtn = document.getElementById('connectBtn');
+                if (this.state.connectionMode) {
+                    connectBtn.className = 'btn btn-orange';
+                    connectBtn.textContent = 'Abbrechen';
+                    connectBtn.onclick = () => this.cancelConnectionMode();
+                } else {
+                    connectBtn.className = 'btn btn-green';
+                    connectBtn.textContent = 'Verbinden';
+                    connectBtn.onclick = () => this.startConnectionMode();
+                }
+
+                document.querySelectorAll('.equipment-btn').forEach(btn => {
+                    if (btn.dataset.id === this.state.selectedTool) {
+                        btn.classList.add('selected');
+                    } else {
+                        btn.classList.remove('selected');
+                    }
+                });
+
+                const controlPanel = document.getElementById('controlPanel');
+                const labelPanel = document.getElementById('labelPanel');
+                if (!labelPanel.classList.contains('hidden')) {
+                    controlPanel.classList.add('hidden');
+                } else if (this.state.selectedItem) {
+                    controlPanel.classList.remove('hidden');
+                } else {
+                    controlPanel.classList.add('hidden');
+                }
+
+                const instruction = document.getElementById('instruction');
+                if (this.state.placedItems.length === 0 && !this.state.selectedTool && !this.state.connectionMode) {
+                    instruction.textContent = 'Wähle ein Gerät und tippe auf die Fläche';
+                    instruction.className = 'instruction instruction-gray';
+                    instruction.classList.remove('hidden');
+                } else if (this.state.selectedTool) {
+                    instruction.textContent = 'Tippe auf die Fläche zum Platzieren';
+                    instruction.className = 'instruction instruction-blue';
+                    instruction.classList.remove('hidden');
+                } else if (this.state.connectionMode && !this.state.firstDevice) {
+                    instruction.textContent = 'Tippe auf das ERSTE Gerät';
+                    instruction.className = 'instruction instruction-green';
+                    instruction.classList.remove('hidden');
+                } else if (this.state.connectionMode && this.state.firstDevice) {
+                    instruction.textContent = 'Tippe auf das ZWEITE Gerät';
+                    instruction.className = 'instruction instruction-green';
+                    instruction.classList.remove('hidden');
+                } else {
+                    instruction.classList.add('hidden');
+                }
+
+                const statusBadge = document.getElementById('statusBadge');
+                if (this.state.isDragging) {
+                    statusBadge.textContent = 'Verschieben...';
+                    statusBadge.className = 'status-badge status-green';
+                    statusBadge.classList.remove('hidden');
+                } else if (this.state.isResizing) {
+                    const scale = Math.round((this.state.selectedItem?.scale || 1) * 100);
+                    statusBadge.textContent = `Größe anpassen... (${scale}%)`;
+                    statusBadge.className = 'status-badge status-purple';
+                    statusBadge.classList.remove('hidden');
+                } else {
+                    statusBadge.classList.add('hidden');
+                }
+            }
+        };
+    </script>
+</body>
+</html>
