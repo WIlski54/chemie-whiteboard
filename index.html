@@ -773,7 +773,7 @@
         // NEU: Funktion zum Aufbau der WebSocket-Verbindung
         function startWebSocketConnection() {
             // WICHTIG: Ersetze 'dein-backend-name.onrender.com' mit dem tatsächlichen Namen deines Render Web Service
-            const ws_url = `wss://dein-backend-name.onrender.com/ws/${sessionData.roomId}`;
+            const ws_url = `wss://chemie-whiteboard-backend.onrender.com/ws/${sessionData.roomId}`;
             websocket = new WebSocket(ws_url);
 
             websocket.onopen = (event) => {
@@ -1367,4 +1367,5 @@
         };
     </script>
 </body>
+
 </html>
