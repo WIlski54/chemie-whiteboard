@@ -880,14 +880,11 @@
                 this.setupEventListeners();
                 this.updateUI();
             },
-            
-            // HINWEIS: Ab hier wurde am Code nichts mehr geändert.
-            // Die Logik zur Darstellung, Verschiebung etc. bleibt dieselbe.
-            
+
             renderPalette() {
                 const palette = document.getElementById('palette');
                 palette.innerHTML = this.equipment.map(eq => `
-                    <button class="equipment-btn" data-id="${eq.id}">
+                    <button class="equipment-btn" data-id="${eq.id}" onclick="app.selectTool('${eq.id}')">
                         <div class="equipment-icon">${eq.img || eq.svg}</div>
                         <div class="equipment-name">${eq.name}</div>
                     </button>
@@ -1244,7 +1241,7 @@
                 const container = document.getElementById('itemsContainer');
                 container.innerHTML = this.state.placedItems.map(item => {
                     const equipment = this.equipment.find(e => e.id === item.type);
-                    if (!equipment) return ''; // Sicherheitshalber, falls ein Gerät nicht gefunden wird
+                    if (!equipment) return ''; // Safety check
                     const size = 80 * (item.scale || 1);
                     const isSelected = this.state.selectedItem?.id === item.id;
                     const isDragging = this.state.isDragging && isSelected;
