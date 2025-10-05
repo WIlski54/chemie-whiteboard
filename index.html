@@ -889,9 +889,10 @@
                 console.log('✅ Join Response:', data);
                 
                 if (data.success) {
-                    sessionData.userId = data.user_id;
-                    startWhiteboard();
-                }
+    sessionData.userId = data.user_id;
+    sessionData.userColor = data.user_color || '#2563eb';
+    startWhiteboard();
+}
             } catch (error) {
                 console.error('❌ Fehler beim Beitreten:', error);
             }
@@ -2040,3 +2041,4 @@
     </script>
 </body>
 </html>
+
