@@ -505,6 +505,11 @@
             animation: pulse 2s infinite;
         }
 
+        .sync-dot.disconnected {
+            background: #ef4444;
+            animation: none;
+        }
+
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -565,8 +570,8 @@
                 <div class="room-info">
                     <div id="roomInfoDisplay"></div>
                     <div class="sync-indicator">
-                        <div class="sync-dot"></div>
-                        <span>Synchronisiert</span>
+                        <div class="sync-dot" id="syncDot"></div>
+                        <span id="syncStatus">Verbinde...</span>
                     </div>
                 </div>
             </div>
@@ -642,6 +647,7 @@
         };
         
         let websocket = null;
+        let isWebSocketConnected = false;
 
         // Tab Switching
         function switchTab(tab) {
@@ -657,11 +663,27 @@
             }
         }
 
+        // Update Sync Indicator
+        function updateSyncIndicator(connected) {
+            const syncDot = document.getElementById('syncDot');
+            const syncStatus = document.getElementById('syncStatus');
+            
+            if (connected) {
+                syncDot.classList.remove('disconnected');
+                syncStatus.textContent = 'Synchronisiert';
+            } else {
+                syncDot.classList.add('disconnected');
+                syncStatus.textContent = 'Getrennt';
+            }
+        }
+
         // Create Room
         async function createRoom(event) {
             event.preventDefault();
             const username = document.getElementById('createName').value;
             const roomName = document.getElementById('roomName').value;
+            
+            console.log('🔨 Erstelle Raum:', roomName);
             
             try {
                 const response = await fetch(`${API_URL}/room/create`, {
@@ -670,6 +692,8 @@
                     body: JSON.stringify({ room_name: roomName })
                 });
                 const data = await response.json();
+                
+                console.log('✅ Raum erstellt:', data);
                 
                 if (data.success) {
                     sessionData.roomId = data.room_id;
@@ -682,13 +706,14 @@
                     alert('Fehler beim Erstellen des Raums.');
                 }
             } catch (error) {
-                console.error('Error:', error);
+                console.error('❌ Fehler beim Erstellen:', error);
                 alert('Verbindungsfehler. Überprüfe deine Internetverbindung.');
             }
         }
 
         async function joinCreatedRoom(roomId, username) {
             try {
+                console.log('👤 Trete erstelltem Raum bei:', roomId);
                 const response = await fetch(`${API_URL}/room/join`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -698,12 +723,14 @@
                     })
                 });
                 const data = await response.json();
+                console.log('✅ Join Response:', data);
+                
                 if (data.success) {
                     sessionData.userId = data.user_id;
                     startWhiteboard();
                 }
             } catch (error) {
-                console.error('Error:', error);
+                console.error('❌ Fehler beim Beitreten:', error);
             }
         }
 
@@ -712,6 +739,8 @@
             event.preventDefault();
             const username = document.getElementById('joinName').value;
             const roomId = document.getElementById('roomId').value;
+            
+            console.log('🚪 Trete Raum bei:', roomId, 'als', username);
             
             try {
                 const response = await fetch(`${API_URL}/room/join`, {
@@ -724,6 +753,8 @@
                 });
                 const data = await response.json();
                 
+                console.log('✅ Join Response:', data);
+                
                 if (data.success) {
                     sessionData.roomId = roomId;
                     sessionData.userId = data.user_id;
@@ -731,6 +762,7 @@
                     sessionData.isCreator = false;
                     
                     if (data.room_state) {
+                        console.log('📥 Lade initialen Raum-State:', data.room_state);
                         app.state.placedItems = data.room_state.items || [];
                         app.state.connections = data.room_state.connections || [];
                     }
@@ -739,13 +771,15 @@
                     alert(data.error || 'Fehler beim Beitreten.');
                 }
             } catch (error) {
-                console.error('Error:', error);
+                console.error('❌ Fehler:', error);
                 alert('Raum nicht gefunden oder Verbindungsfehler.');
             }
         }
 
         // Start Whiteboard
         function startWhiteboard() {
+            console.log('🎨 Starte Whiteboard für Raum:', sessionData.roomId);
+            
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('app').classList.add('active');
             
@@ -756,39 +790,86 @@
             app.render();
             app.updateUI();
             
+            // WebSocket-Verbindung herstellen
             startWebSocketConnection();
         }
         
         function startWebSocketConnection() {
             const ws_url = `wss://chemie-whiteboard-backend.onrender.com/ws/${sessionData.roomId}`;
+            console.log('🔌 Verbinde WebSocket:', ws_url);
+            
+            updateSyncIndicator(false);
             websocket = new WebSocket(ws_url);
 
             websocket.onopen = (event) => {
-                console.log("WebSocket-Verbindung erfolgreich hergestellt.");
+                console.log("✅ WebSocket-Verbindung erfolgreich hergestellt!");
+                isWebSocketConnected = true;
+                updateSyncIndicator(true);
+                
+                // Optional: Sende initialen State nach Verbindung
+                if (app.state.placedItems.length > 0 || app.state.connections.length > 0) {
+                    console.log('📤 Sende initialen State nach Verbindung');
+                    sendUpdate();
+                }
             };
 
             websocket.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                if (data.items !== undefined && data.connections !== undefined) {
-                    app.state.placedItems = data.items;
-                    app.state.connections = data.connections;
-                    app.render();
-                    app.updateUI();
+                console.log("📨 Empfange Update:", event.data.substring(0, 100) + '...');
+                
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.items !== undefined && data.connections !== undefined) {
+                        console.log('✅ State aktualisiert:', {
+                            items: data.items.length,
+                            connections: data.connections.length
+                        });
+                        app.state.placedItems = data.items;
+                        app.state.connections = data.connections;
+                        app.render();
+                        app.updateUI();
+                    }
+                } catch (e) {
+                    console.error('❌ Fehler beim Parsen:', e);
                 }
             };
 
             websocket.onclose = (event) => {
-                console.log("WebSocket-Verbindung geschlossen.");
+                console.log("❌ WebSocket-Verbindung geschlossen.", 
+                    "Code:", event.code, 
+                    "Reason:", event.reason);
+                isWebSocketConnected = false;
+                updateSyncIndicator(false);
+                
+                // Optional: Automatischer Reconnect nach 3 Sekunden
+                if (sessionData.roomId) {
+                    console.log('🔄 Versuche Reconnect in 3 Sekunden...');
+                    setTimeout(() => {
+                        console.log('🔄 Reconnect...');
+                        startWebSocketConnection();
+                    }, 3000);
+                }
             };
 
             websocket.onerror = (error) => {
-                console.error("WebSocket-Fehler:", error);
-                alert("Es gab einen Fehler mit der Echtzeit-Verbindung.");
+                console.error("⚠️ WebSocket-Fehler:", error);
+                isWebSocketConnected = false;
+                updateSyncIndicator(false);
             };
         }
 
         function sendUpdate() {
+            console.log('📤 Versuche Update zu senden...', {
+                hasRoomId: !!sessionData.roomId,
+                hasWebSocket: !!websocket,
+                wsReadyState: websocket?.readyState,
+                isConnected: isWebSocketConnected
+            });
+            
             if (!sessionData.roomId || !websocket || websocket.readyState !== WebSocket.OPEN) {
+                console.warn('⚠️ Update NICHT gesendet! Verbindung nicht bereit.');
+                console.warn('  - Raum-ID:', sessionData.roomId);
+                console.warn('  - WebSocket:', websocket ? 'existiert' : 'null');
+                console.warn('  - ReadyState:', websocket?.readyState, '(OPEN=1)');
                 return;
             }
             
@@ -797,7 +878,18 @@
                 connections: app.state.connections
             });
 
-            websocket.send(payload);
+            console.log('✉️ Sende Update:', {
+                itemCount: app.state.placedItems.length,
+                connectionCount: app.state.connections.length,
+                payloadSize: payload.length + ' Bytes'
+            });
+            
+            try {
+                websocket.send(payload);
+                console.log('✅ Update erfolgreich gesendet');
+            } catch (e) {
+                console.error('❌ Fehler beim Senden:', e);
+            }
         }
 
         function showRoomInfo() {
@@ -876,6 +968,7 @@
             ],
 
             init() {
+                console.log('🎨 Initialisiere App');
                 this.renderPalette();
                 this.setupEventListeners();
                 this.updateUI();
@@ -911,6 +1004,7 @@
             },
 
             selectTool(id) {
+                console.log('🔧 Tool ausgewählt:', id);
                 this.state.selectedTool = id;
                 this.state.selectedItem = null;
                 this.updateUI();
@@ -950,6 +1044,7 @@
             },
 
             placeItem(x, y) {
+                console.log('➕ Platziere Item:', this.state.selectedTool, 'bei', x, y);
                 const newItem = {
                     id: Date.now(),
                     type: this.state.selectedTool,
@@ -968,9 +1063,11 @@
 
             handleConnection(item) {
                 if (!this.state.firstDevice) {
+                    console.log('🔗 Erstes Gerät ausgewählt:', item.type);
                     this.state.firstDevice = item;
                     this.updateUI();
                 } else if (this.state.firstDevice.id !== item.id) {
+                    console.log('🔗 Verbindung erstellt von', this.state.firstDevice.type, 'zu', item.type);
                     this.state.connections.push({
                         id: Date.now(),
                         from: this.state.firstDevice.id,
@@ -1049,6 +1146,7 @@
 
             handleEnd() {
                 if (this.state.isDragging || this.state.isResizing) {
+                    console.log('📤 Sende Update nach Drag/Resize');
                     sendUpdate();
                 }
                 this.state.isDragging = false;
@@ -1058,6 +1156,7 @@
 
             rotateItem() {
                 if (!this.state.selectedItem) return;
+                console.log('🔄 Drehe Item:', this.state.selectedItem.type);
                 this.state.selectedItem.rotation = (this.state.selectedItem.rotation + 90) % 360;
                 this.render();
                 sendUpdate();
@@ -1065,6 +1164,7 @@
 
             deleteItem() {
                 if (!this.state.selectedItem) return;
+                console.log('🗑️ Lösche Item:', this.state.selectedItem.type);
                 this.state.connections = this.state.connections.filter(conn => 
                     conn.from !== this.state.selectedItem.id && conn.to !== this.state.selectedItem.id
                 );
@@ -1086,6 +1186,7 @@
 
             saveLabel() {
                 if (!this.state.selectedItem) return;
+                console.log('🏷️ Label gespeichert:', document.getElementById('labelInput').value);
                 this.state.selectedItem.label = document.getElementById('labelInput').value;
                 this.cancelLabel();
                 this.render();
@@ -1098,6 +1199,7 @@
             },
 
             startConnectionMode() {
+                console.log('🔗 Verbindungsmodus gestartet');
                 this.state.connectionMode = true;
                 this.state.firstDevice = null;
                 this.state.selectedItem = null;
@@ -1106,6 +1208,7 @@
             },
 
             cancelConnectionMode() {
+                console.log('❌ Verbindungsmodus abgebrochen');
                 this.state.connectionMode = false;
                 this.state.firstDevice = null;
                 this.updateUI();
@@ -1120,6 +1223,7 @@
             },
 
             clearAll() {
+                console.log('🗑️ Lösche alles');
                 this.state.placedItems = [];
                 this.state.connections = [];
                 this.state.selectedItem = null;
@@ -1133,6 +1237,7 @@
             },
 
             saveSetup() {
+                console.log('💾 Speichere Setup');
                 const setup = {
                     version: '1.0',
                     timestamp: new Date().toISOString(),
@@ -1160,6 +1265,8 @@
                 const file = event.target.files?.[0];
                 if (!file) return;
                 
+                console.log('📂 Lade Setup aus Datei:', file.name);
+                
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     try {
@@ -1172,6 +1279,11 @@
                             this.state.connections = setup.connections;
                         }
                         
+                        console.log('✅ Setup geladen:', {
+                            items: this.state.placedItems.length,
+                            connections: this.state.connections.length
+                        });
+                        
                         this.state.selectedItem = null;
                         this.state.selectedTool = null;
                         this.state.connectionMode = false;
@@ -1182,6 +1294,7 @@
                         sendUpdate();
                         alert('Versuchsaufbau erfolgreich geladen!');
                     } catch (error) {
+                        console.error('❌ Fehler beim Laden:', error);
                         alert('Fehler beim Laden der Datei.');
                     }
                 };
@@ -1193,6 +1306,7 @@
             async exportToPDF() {
                 if (this.state.isExporting) return;
                 
+                console.log('📄 Exportiere zu PDF');
                 this.state.isExporting = true;
                 const pdfBtn = document.getElementById('pdfBtn');
                 const pdfBtnText = document.getElementById('pdfBtnText');
@@ -1222,8 +1336,9 @@
                     pdf.text(`Versuchsaufbau - Exportiert am ${timestamp}`, 10, canvas.height - 10);
                     
                     pdf.save(`versuchsaufbau-${Date.now()}.pdf`);
+                    console.log('✅ PDF erfolgreich exportiert');
                 } catch (error) {
-                    console.error('PDF Export Fehler:', error);
+                    console.error('❌ PDF Export Fehler:', error);
                     alert('Fehler beim PDF-Export.');
                 } finally {
                     this.state.isExporting = false;
@@ -1241,7 +1356,7 @@
                 const container = document.getElementById('itemsContainer');
                 container.innerHTML = this.state.placedItems.map(item => {
                     const equipment = this.equipment.find(e => e.id === item.type);
-                    if (!equipment) return ''; // Safety check
+                    if (!equipment) return '';
                     const size = 80 * (item.scale || 1);
                     const isSelected = this.state.selectedItem?.id === item.id;
                     const isDragging = this.state.isDragging && isSelected;
@@ -1296,6 +1411,7 @@
             },
 
             deleteConnection(id) {
+                console.log('🗑️ Lösche Verbindung:', id);
                 this.state.connections = this.state.connections.filter(c => c.id !== id);
                 this.render();
                 sendUpdate();
