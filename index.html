@@ -1886,49 +1886,90 @@
                 event.target.value = '';
             },
 
-            async exportToPDF() {
-                if (this.state.isExporting) return;
-                
-                console.log('📄 Exportiere zu PDF');
-                this.state.isExporting = true;
-                const pdfBtn = document.getElementById('pdfBtn');
-                const pdfBtnText = document.getElementById('pdfBtnText');
-                pdfBtn.disabled = true;
-                pdfBtnText.textContent = 'Erstelle PDF...';
-                
-                try {
-                    const canvas = await html2canvas(document.getElementById('canvas'), {
-                        backgroundColor: '#ffffff',
-                        scale: 2,
-                        logging: false
-                    });
-                    
-                    const imgData = canvas.toDataURL('image/png');
-                    const { jsPDF } = window.jspdf;
-                    const pdf = new jsPDF({
-                        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
-                        unit: 'px',
-                        format: [canvas.width, canvas.height]
-                    });
-                    
-                    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-                    
-                    const timestamp = new Date().toLocaleString('de-DE');
-                    pdf.setFontSize(10);
-                    pdf.setTextColor(150);
-                    pdf.text(`Versuchsaufbau - Exportiert am ${timestamp}`, 10, canvas.height - 10);
-                    
-                    pdf.save(`versuchsaufbau-${Date.now()}.pdf`);
-                    console.log('✅ PDF erfolgreich exportiert');
-                } catch (error) {
-                    console.error('❌ PDF Export Fehler:', error);
-                    alert('Fehler beim PDF-Export.');
-                } finally {
-                    this.state.isExporting = false;
-                    pdfBtn.disabled = false;
-                    pdfBtnText.textContent = 'PDF Export';
-                }
-            },
+           // =======================================
+// Verbesserte Exportfunktion für PDF
+// =======================================
+async exportToPDF(mode = 'fit') {
+  if (this.state.isExporting) return;
+  console.log("📄 Exportiere zu PDF …");
+  this.state.isExporting = true;
+
+  const pdfBtn = document.getElementById('pdfBtn');
+  const pdfBtnText = document.getElementById('pdfBtnText');
+  pdfBtn.disabled = true;
+  pdfBtnText.textContent = 'Erstelle PDF …';
+
+  try {
+    const stage = document.getElementById('canvas') || document.getElementById('stage');
+    if (!stage) throw new Error('Stage nicht gefunden');
+
+    // Screenshot mit höherer Auflösung
+    const canvas = await html2canvas(stage, {
+      backgroundColor: '#ffffff',
+      scale: 2
+    });
+    const imgData = canvas.toDataURL('image/png');
+
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const landscape = cw >= ch;
+
+    const { jsPDF } = window.jspdf;
+
+    if (mode === 'true') {
+      // 1:1-Export im Original-Seitenverhältnis
+      const pxToPt = 72 / 96; // Umrechnung px → pt
+      const pdfW = cw * pxToPt;
+      const pdfH = ch * pxToPt;
+
+      const pdf = new jsPDF({
+        orientation: landscape ? 'l' : 'p',
+        unit: 'pt',
+        format: [pdfW, pdfH]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
+      pdf.save(`versuchsaufbau_original_${Date.now()}.pdf`);
+    } else {
+      // A4-Export mit proportionaler Skalierung
+      const pdf = new jsPDF({
+        orientation: landscape ? 'l' : 'p',
+        unit: 'pt',
+        format: 'a4'
+      });
+
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 24;
+
+      const maxW = pageW - 2 * margin;
+      const maxH = pageH - 2 * margin;
+
+      let renderW = maxW;
+      let renderH = (ch / cw) * renderW;
+      if (renderH > maxH) {
+        renderH = maxH;
+        renderW = (cw / ch) * renderH;
+      }
+      const x = (pageW - renderW) / 2;
+      const y = (pageH - renderH) / 2;
+
+      pdf.addImage(imgData, 'PNG', x, y, renderW, renderH);
+      const timestamp = new Date().toLocaleString('de-DE');
+      pdf.setFontSize(10);
+      pdf.text(`Versuchsaufbau – Exportiert am ${timestamp}`, margin, pageH - 20);
+      pdf.save(`versuchsaufbau_A4_${Date.now()}.pdf`);
+    }
+
+    console.log("✅ PDF erfolgreich exportiert");
+  } catch (error) {
+    console.error("❌ Fehler beim PDF-Export:", error);
+    alert("Fehler beim PDF-Export.");
+  } finally {
+    this.state.isExporting = false;
+    pdfBtn.disabled = false;
+    pdfBtnText.textContent = 'PDF Export';
+  }
+},
 
             render() {
                 this.renderItems();
@@ -2072,6 +2113,7 @@
     </script>
 </body>
 </html>
+
 
 
 
