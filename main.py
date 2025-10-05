@@ -26,8 +26,16 @@ app.add_middleware(
 ADMIN_PASSWORD = "lehrer2025"
 
 # Dieses Dictionary speichert alle aktiven Räume und die WebSocket-Verbindungen.
-# Format: { "raum_id": { "sockets": {websocket1, websocket2, ...}, "state": {...}, "info": {...} } }
+# Format: { "raum_id": { "sockets": {websocket: user_info}, "state": {...}, "info": {...} } }
 rooms = {}
+
+# Farben für User-Avatare
+USER_COLORS = [
+    "#ef4444", "#f97316", "#f59e0b", "#eab308", "#84cc16",
+    "#22c55e", "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9",
+    "#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#d946ef",
+    "#ec4899", "#f43f5e"
+]
 
 class RoomCreationRequest(BaseModel):
     room_name: str
@@ -48,7 +56,7 @@ async def create_room(request: RoomCreationRequest):
     
     # Initialisiere den Raum im Speicher
     rooms[room_id] = {
-        "sockets": set(),
+        "sockets": {},  # Jetzt dict: {websocket: user_info}
         "state": {"items": [], "connections": []},
         "info": {
             "name": request.room_name,
@@ -69,7 +77,7 @@ async def join_room(request: RoomJoinRequest):
     if request.room_id not in rooms:
         print(f"⚠️ Raum {request.room_id} existiert nicht, erstelle neuen Raum")
         rooms[request.room_id] = {
-            "sockets": set(),
+            "sockets": {},
             "state": {"items": [], "connections": []},
             "info": {
                 "name": "Unbekannt",
@@ -89,21 +97,28 @@ async def join_room(request: RoomJoinRequest):
     if rooms[request.room_id]["info"]["creator"] is None:
         rooms[request.room_id]["info"]["creator"] = request.username
     
+    # Weise User eine Farbe zu
+    used_colors = [u.get("color") for u in rooms[request.room_id]["info"]["users"]]
+    available_colors = [c for c in USER_COLORS if c not in used_colors]
+    user_color = available_colors[0] if available_colors else USER_COLORS[0]
+    
     # Füge User zur Liste hinzu (wenn noch nicht vorhanden)
     user_exists = any(u["username"] == request.username for u in rooms[request.room_id]["info"]["users"])
     if not user_exists:
         rooms[request.room_id]["info"]["users"].append({
             "username": request.username,
-            "joined_at": datetime.now().isoformat()
+            "joined_at": datetime.now().isoformat(),
+            "color": user_color
         })
     
-    print(f"✅ User {request.username} tritt Raum {request.room_id} bei")
+    print(f"✅ User {request.username} tritt Raum {request.room_id} bei (Farbe: {user_color})")
 
     # Den aktuellen Zustand des Raumes zurückgeben, wenn jemand beitritt
     return {
         "success": True, 
         "user_id": ''.join(random.choices(string.ascii_lowercase, k=10)),
-        "room_state": rooms[request.room_id]["state"]
+        "room_state": rooms[request.room_id]["state"],
+        "user_color": user_color
     }
 
 # --- ADMIN-ENDPUNKTE ---
@@ -180,7 +195,7 @@ async def delete_room(room_id: str, password: str = Query(...)):
         raise HTTPException(status_code=404, detail="Room not found")
     
     # Alle WebSocket-Verbindungen schließen
-    for ws in list(rooms[room_id]["sockets"]):
+    for ws in list(rooms[room_id]["sockets"].keys()):
         try:
             await ws.close(code=1000, reason="Raum vom Admin gelöscht")
         except:
@@ -201,7 +216,6 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
 
     # Client zum Raum hinzufügen
     if room_id not in rooms:
-        # Verbindung ablehnen, wenn der Raum nicht existiert
         print(f"❌ Raum {room_id} existiert nicht! Schließe WebSocket.")
         await websocket.close(code=1008)
         return
@@ -211,51 +225,120 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
         print(f"🔒 WebSocket-Verbindung abgelehnt - Raum {room_id} ist gesperrt")
         await websocket.close(code=1008, reason="Raum gesperrt")
         return
+    
+    # Warte auf erste Nachricht mit User-Info
+    try:
+        init_data = await websocket.receive_text()
+        init_msg = json.loads(init_data)
         
-    rooms[room_id]["sockets"].add(websocket)
+        if init_msg.get("type") == "join":
+            user_info = {
+                "username": init_msg.get("username"),
+                "user_id": init_msg.get("user_id"),
+                "color": init_msg.get("color"),
+                "last_activity": datetime.now().isoformat()
+            }
+            rooms[room_id]["sockets"][websocket] = user_info
+            
+            print(f"👤 User {user_info['username']} verbunden mit Raum {room_id}")
+            
+            # Sende Join-Nachricht an alle anderen
+            await broadcast_user_event(room_id, {
+                "type": "user_joined",
+                "user": user_info
+            }, exclude=websocket)
+            
+            # Sende Liste aller aktuellen User an den neuen User
+            current_users = [info for info in rooms[room_id]["sockets"].values()]
+            await websocket.send_text(json.dumps({
+                "type": "users_list",
+                "users": current_users
+            }))
+            
+    except Exception as e:
+        print(f"❌ Fehler beim User-Join: {e}")
+        await websocket.close(code=1008)
+        return
+    
     connection_count = len(rooms[room_id]["sockets"])
     print(f"👥 Raum {room_id} hat jetzt {connection_count} aktive Verbindung(en)")
 
     try:
         while True:
-            # Auf eine Nachricht vom Client warten (das ist der Whiteboard-Zustand)
             data = await websocket.receive_text()
+            msg = json.loads(data)
             
-            # Debug: Zeige ersten Teil der Nachricht
-            preview = data[:150] + "..." if len(data) > 150 else data
-            print(f"📨 Update empfangen für Raum {room_id}: {preview}")
+            # Update last_activity
+            if websocket in rooms[room_id]["sockets"]:
+                rooms[room_id]["sockets"][websocket]["last_activity"] = datetime.now().isoformat()
             
-            # Den neuen Zustand für den Raum speichern
-            try:
-                rooms[room_id]["state"] = json.loads(data)
-            except json.JSONDecodeError as e:
-                print(f"⚠️ JSON Parse Error: {e}")
-                continue
+            # Handle verschiedene Message-Typen
+            if msg.get("type") == "state_update":
+                # Normales State-Update
+                rooms[room_id]["state"] = msg.get("state", {})
+                await broadcast_to_others(room_id, data, websocket)
+                
+            elif msg.get("type") == "activity":
+                # Activity-Event (z.B. "bewegt Becherglas")
+                await broadcast_to_others(room_id, data, websocket)
             
-            # Die empfangene Nachricht an alle ANDEREN Clients im selben Raum senden
-            other_clients = [client for client in rooms[room_id]["sockets"] if client != websocket]
-            print(f"📤 Sende Update an {len(other_clients)} andere Client(s)")
-            
-            tasks = []
-            for client in other_clients:
-                tasks.append(client.send_text(data))
-            
-            if tasks:
-                try:
-                    await asyncio.gather(*tasks)
-                    print(f"✅ Update erfolgreich verteilt an {len(tasks)} Client(s)")
-                except Exception as e:
-                    print(f"⚠️ Fehler beim Verteilen: {e}")
+            elif msg.get("type") == "ping":
+                # Keepalive
+                await websocket.send_text(json.dumps({"type": "pong"}))
 
     except WebSocketDisconnect:
-        # Client aus dem Raum entfernen, wenn die Verbindung abbricht
-        print(f"❌ Client getrennt von Raum {room_id}")
-        rooms[room_id]["sockets"].remove(websocket)
-        remaining = len(rooms[room_id]["sockets"])
-        print(f"👥 Raum {room_id} hat noch {remaining} Verbindung(en)")
-        
-        # Wenn der Raum leer ist, löschen wir ihn (optional, spart Speicher)
-        if not rooms[room_id]["sockets"]:
-            del rooms[room_id]
-            print(f"🗑️ Raum {room_id} gelöscht (keine Verbindungen mehr)")
-            print(f"📊 Aktive Räume: {list(rooms.keys())}")
+        # User hat Verbindung getrennt
+        if websocket in rooms[room_id]["sockets"]:
+            user_info = rooms[room_id]["sockets"][websocket]
+            print(f"❌ User {user_info['username']} getrennt von Raum {room_id}")
+            
+            # Remove socket
+            del rooms[room_id]["sockets"][websocket]
+            
+            # Broadcast Leave-Event
+            await broadcast_user_event(room_id, {
+                "type": "user_left",
+                "user_id": user_info["user_id"]
+            })
+            
+            remaining = len(rooms[room_id]["sockets"])
+            print(f"👥 Raum {room_id} hat noch {remaining} Verbindung(en)")
+            
+            # Wenn der Raum leer ist, löschen
+            if not rooms[room_id]["sockets"]:
+                del rooms[room_id]
+                print(f"🗑️ Raum {room_id} gelöscht (keine Verbindungen mehr)")
+                print(f"📊 Aktive Räume: {list(rooms.keys())}")
+
+async def broadcast_to_others(room_id: str, data: str, exclude_websocket: WebSocket):
+    """Sende Nachricht an alle außer dem Sender"""
+    if room_id not in rooms:
+        return
+    
+    tasks = []
+    for ws in rooms[room_id]["sockets"].keys():
+        if ws != exclude_websocket:
+            tasks.append(ws.send_text(data))
+    
+    if tasks:
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        except Exception as e:
+            print(f"⚠️ Fehler beim Broadcast: {e}")
+
+async def broadcast_user_event(room_id: str, event: dict, exclude: WebSocket = None):
+    """Sende User-Event an alle (oder alle außer exclude)"""
+    if room_id not in rooms:
+        return
+    
+    data = json.dumps(event)
+    tasks = []
+    for ws in rooms[room_id]["sockets"].keys():
+        if ws != exclude:
+            tasks.append(ws.send_text(data))
+    
+    if tasks:
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        except Exception as e:
+            print(f"⚠️ Fehler beim User-Event Broadcast: {e}")
