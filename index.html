@@ -615,6 +615,32 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+        /* --- Sidebar sichtbar machen und im Flex-Layout verankern --- */
+.main-content{
+  display: flex;        
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.canvas-area{
+  flex: 1 1 auto;       
+  min-width: 0;
+}
+.users-sidebar{
+  flex: 0 0 250px !important;   
+  width: 250px !important;
+  min-width: 250px !important;
+  display: block !important;
+  background: #f9fafb;
+  border-left: 4px solid #e5e7eb;
+  overflow-y: auto;
+  padding: 1rem;
+  position: relative;
+  z-index: 5;
+}
+/* Debugrahmen: kurz aktiv lassen, um Sichtbarkeit zu prüfen */
+/* .users-sidebar{ outline:3px solid #ef4444; } */
+
     </style>
 </head>
 <body>
@@ -2046,5 +2072,6 @@
     </script>
 </body>
 </html>
+
 
 
