@@ -525,6 +525,7 @@
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('create')">Raum erstellen</button>
                 <button class="tab" onclick="switchTab('join')">Raum beitreten</button>
+                <button class="tab" onclick="switchTab('admin')">🔐 Lehrermodus</button>
             </div>
 
             <div class="tab-content active" id="createTab">
@@ -559,6 +560,49 @@
                         Gib die Raum-ID ein, die dir dein Lehrer gegeben hat.
                     </div>
                 </form>
+            </div>
+
+            <div class="tab-content" id="adminTab">
+                <form onsubmit="adminLogin(event)">
+                    <div class="form-group">
+                        <label>Lehrer-Passwort</label>
+                        <input type="password" id="adminPassword" placeholder="Passwort eingeben" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Anmelden</button>
+                    <div class="info-box">
+                        Nur für Lehrkräfte: Hier kannst du alle Räume verwalten, sperren oder löschen.
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div class="app" id="adminApp" style="display: none;">
+        <div class="header">
+            <div class="header-left">
+                <h1>🔐 Admin-Übersicht</h1>
+            </div>
+            <div class="header-buttons">
+                <button class="btn btn-white" onclick="refreshAdminData()">🔄 Aktualisieren</button>
+                <button class="btn btn-red" onclick="logoutAdmin()">Abmelden</button>
+            </div>
+        </div>
+
+        <div style="flex: 1; overflow-y: auto; padding: 2rem; background-color: #f9fafb;">
+            <div style="max-width: 1200px; margin: 0 auto;">
+                <div id="adminStats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                    <!-- Stats werden hier eingefügt -->
+                </div>
+
+                <div style="background: white; border-radius: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
+                    <div style="padding: 1.5rem; border-bottom: 2px solid #e5e7eb;">
+                        <h2 style="font-size: 1.25rem; font-weight: bold; color: #1f2937;">Aktive Räume</h2>
+                    </div>
+                    <div id="adminRoomsList" style="padding: 1rem;">
+                        <!-- Räume werden hier eingefügt -->
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -648,6 +692,7 @@
         
         let websocket = null;
         let isWebSocketConnected = false;
+        let adminPassword = null; // Admin-Passwort speichern
 
         // Tab Switching
         function switchTab(tab) {
@@ -657,9 +702,12 @@
             if (tab === 'create') {
                 document.querySelectorAll('.tab')[0].classList.add('active');
                 document.getElementById('createTab').classList.add('active');
-            } else {
+            } else if (tab === 'join') {
                 document.querySelectorAll('.tab')[1].classList.add('active');
                 document.getElementById('joinTab').classList.add('active');
+            } else if (tab === 'admin') {
+                document.querySelectorAll('.tab')[2].classList.add('active');
+                document.getElementById('adminTab').classList.add('active');
             }
         }
 
@@ -894,6 +942,237 @@
 
         function showRoomInfo() {
             alert(`Raum-ID: ${sessionData.roomId}\nDein Name: ${sessionData.username}\n\nTeile die Raum-ID mit anderen!`);
+        }
+
+        // --- ADMIN-FUNKTIONEN ---
+        
+        async function adminLogin(event) {
+            event.preventDefault();
+            const password = document.getElementById('adminPassword').value;
+            
+            console.log('🔐 Admin-Login Versuch');
+            
+            try {
+                const response = await fetch(`${API_URL}/admin/login`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ password: password })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log('✅ Admin erfolgreich eingeloggt');
+                    adminPassword = password;
+                    showAdminDashboard();
+                } else {
+                    alert('Falsches Passwort!');
+                }
+            } catch (error) {
+                console.error('❌ Admin-Login Fehler:', error);
+                alert('Verbindungsfehler beim Login.');
+            }
+        }
+
+        function showAdminDashboard() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('adminApp').style.display = 'flex';
+            refreshAdminData();
+            
+            // Auto-refresh alle 5 Sekunden
+            setInterval(refreshAdminData, 5000);
+        }
+
+        async function refreshAdminData() {
+            if (!adminPassword) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/admin/overview?password=${encodeURIComponent(adminPassword)}`);
+                const data = await response.json();
+                
+                console.log('📊 Admin-Daten geladen:', data);
+                
+                displayAdminStats(data.rooms);
+                displayAdminRooms(data.rooms);
+            } catch (error) {
+                console.error('❌ Fehler beim Laden der Admin-Daten:', error);
+            }
+        }
+
+        function displayAdminStats(rooms) {
+            const totalRooms = rooms.length;
+            const totalConnections = rooms.reduce((sum, r) => sum + r.active_connections, 0);
+            const totalUsers = rooms.reduce((sum, r) => sum + r.total_users, 0);
+            const lockedRooms = rooms.filter(r => r.locked).length;
+            
+            document.getElementById('adminStats').innerHTML = `
+                <div style="background: white; padding: 1.5rem; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="font-size: 2rem; font-weight: bold; color: #2563eb;">${totalRooms}</div>
+                    <div style="color: #6b7280; margin-top: 0.5rem;">Aktive Räume</div>
+                </div>
+                <div style="background: white; padding: 1.5rem; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="font-size: 2rem; font-weight: bold; color: #22c55e;">${totalConnections}</div>
+                    <div style="color: #6b7280; margin-top: 0.5rem;">Live-Verbindungen</div>
+                </div>
+                <div style="background: white; padding: 1.5rem; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="font-size: 2rem; font-weight: bold; color: #a855f7;">${totalUsers}</div>
+                    <div style="color: #6b7280; margin-top: 0.5rem;">Nutzer (gesamt)</div>
+                </div>
+                <div style="background: white; padding: 1.5rem; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="font-size: 2rem; font-weight: bold; color: #ef4444;">${lockedRooms}</div>
+                    <div style="color: #6b7280; margin-top: 0.5rem;">Gesperrte Räume</div>
+                </div>
+            `;
+        }
+
+        function displayAdminRooms(rooms) {
+            if (rooms.length === 0) {
+                document.getElementById('adminRoomsList').innerHTML = `
+                    <div style="text-align: center; padding: 3rem; color: #9ca3af;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+                        <div>Keine aktiven Räume vorhanden</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            document.getElementById('adminRoomsList').innerHTML = rooms.map(room => {
+                const createdDate = new Date(room.created_at).toLocaleString('de-DE');
+                
+                return `
+                    <div style="border: 2px solid ${room.locked ? '#ef4444' : '#e5e7eb'}; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; background: ${room.locked ? '#fef2f2' : 'white'};">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                    <h3 style="font-size: 1.125rem; font-weight: bold; color: #1f2937;">${room.name}</h3>
+                                    ${room.locked ? '<span style="background: #ef4444; color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: bold;">🔒 GESPERRT</span>' : ''}
+                                </div>
+                                <div style="font-family: monospace; color: #6b7280; font-size: 0.875rem;">ID: ${room.room_id}</div>
+                                <div style="color: #6b7280; font-size: 0.875rem; margin-top: 0.25rem;">Erstellt: ${createdDate}</div>
+                                <div style="color: #6b7280; font-size: 0.875rem;">Ersteller: ${room.creator || 'Unbekannt'}</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="display: inline-block; background: #eff6ff; color: #2563eb; padding: 0.5rem 1rem; border-radius: 0.5rem; margin-bottom: 0.5rem;">
+                                    <div style="font-size: 1.5rem; font-weight: bold;">${room.active_connections}</div>
+                                    <div style="font-size: 0.75rem;">Live</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; padding: 0.75rem; background: #f9fafb; border-radius: 0.5rem;">
+                            <div>
+                                <div style="color: #6b7280; font-size: 0.75rem;">Nutzer gesamt</div>
+                                <div style="font-weight: bold; color: #1f2937;">${room.total_users}</div>
+                            </div>
+                            <div>
+                                <div style="color: #6b7280; font-size: 0.75rem;">Geräte</div>
+                                <div style="font-weight: bold; color: #1f2937;">${room.items_count}</div>
+                            </div>
+                            <div>
+                                <div style="color: #6b7280; font-size: 0.75rem;">Verbindungen</div>
+                                <div style="font-weight: bold; color: #1f2937;">${room.connections_count}</div>
+                            </div>
+                        </div>
+                        
+                        ${room.users.length > 0 ? `
+                            <details style="margin-bottom: 1rem;">
+                                <summary style="cursor: pointer; color: #2563eb; font-weight: 500; padding: 0.5rem;">
+                                    👥 ${room.users.length} Nutzer anzeigen
+                                </summary>
+                                <div style="margin-top: 0.5rem; padding: 0.75rem; background: #f9fafb; border-radius: 0.5rem;">
+                                    ${room.users.map(user => `
+                                        <div style="padding: 0.5rem 0; border-bottom: 1px solid #e5e7eb;">
+                                            <strong>${user.username}</strong>
+                                            <span style="color: #6b7280; font-size: 0.875rem; margin-left: 0.5rem;">
+                                                ${new Date(user.joined_at).toLocaleString('de-DE')}
+                                            </span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </details>
+                        ` : ''}
+                        
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            ${room.locked ? `
+                                <button onclick="unlockRoom('${room.room_id}')" 
+                                        style="padding: 0.5rem 1rem; background: #22c55e; color: white; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: 500;">
+                                    🔓 Entsperren
+                                </button>
+                            ` : `
+                                <button onclick="lockRoom('${room.room_id}')" 
+                                        style="padding: 0.5rem 1rem; background: #f97316; color: white; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: 500;">
+                                    🔒 Sperren
+                                </button>
+                            `}
+                            <button onclick="deleteRoom('${room.room_id}')" 
+                                    style="padding: 0.5rem 1rem; background: #ef4444; color: white; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: 500;">
+                                🗑️ Löschen
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function lockRoom(roomId) {
+            if (!confirm('Möchtest du diesen Raum wirklich sperren? Neue Verbindungen werden verhindert.')) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/admin/room/${roomId}/lock?password=${encodeURIComponent(adminPassword)}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log(`🔒 Raum ${roomId} gesperrt`);
+                    refreshAdminData();
+                }
+            } catch (error) {
+                console.error('❌ Fehler beim Sperren:', error);
+                alert('Fehler beim Sperren des Raums.');
+            }
+        }
+
+        async function unlockRoom(roomId) {
+            try {
+                const response = await fetch(`${API_URL}/admin/room/${roomId}/unlock?password=${encodeURIComponent(adminPassword)}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log(`🔓 Raum ${roomId} entsperrt`);
+                    refreshAdminData();
+                }
+            } catch (error) {
+                console.error('❌ Fehler beim Entsperren:', error);
+                alert('Fehler beim Entsperren des Raums.');
+            }
+        }
+
+        async function deleteRoom(roomId) {
+            if (!confirm('Möchtest du diesen Raum wirklich löschen? Alle Verbindungen werden getrennt und der Raum ist unwiederbringlich verloren!')) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/admin/room/${roomId}?password=${encodeURIComponent(adminPassword)}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log(`🗑️ Raum ${roomId} gelöscht`);
+                    refreshAdminData();
+                }
+            } catch (error) {
+                console.error('❌ Fehler beim Löschen:', error);
+                alert('Fehler beim Löschen des Raums.');
+            }
+        }
+
+        function logoutAdmin() {
+            adminPassword = null;
+            document.getElementById('adminApp').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('adminPassword').value = '';
         }
 
         // Whiteboard App
