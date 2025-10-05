@@ -144,6 +144,105 @@
             display: flex;
         }
 
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .canvas-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .users-sidebar {
+            width: 250px;
+            background-color: #f9fafb;
+            border-left: 4px solid #e5e7eb;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .users-sidebar h3 {
+            font-size: 0.875rem;
+            font-weight: bold;
+            color: #6b7280;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .user-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: white;
+            border-radius: 0.5rem;
+            border: 2px solid #e5e7eb;
+            transition: all 0.2s;
+        }
+
+        .user-item.active {
+            border-color: #22c55e;
+            background: #f0fdf4;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.875rem;
+            flex-shrink: 0;
+        }
+
+        .user-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-name {
+            font-weight: 500;
+            color: #1f2937;
+            font-size: 0.875rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-status {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        .activity-badge {
+            position: absolute;
+            background: white;
+            border: 2px solid;
+            border-radius: 0.5rem;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
         .header {
             background-color: #2563eb;
             color: white;
@@ -633,35 +732,48 @@
 
         <input type="file" id="fileInput" accept=".json" class="hidden">
 
-        <div class="canvas-container" id="canvas">
-            <svg class="canvas-svg" id="connectionsSvg"></svg>
-            <div class="items-container" id="itemsContainer"></div>
-            
-            <div id="instruction" class="instruction instruction-gray">
-                Wähle ein Gerät und tippe auf die Fläche
+        <div class="main-content">
+            <div class="canvas-area">
+                <div class="canvas-container" id="canvas">
+                    <svg class="canvas-svg" id="connectionsSvg"></svg>
+                    <div class="items-container" id="itemsContainer"></div>
+                    <div id="activityBadges"></div>
+                    
+                    <div id="instruction" class="instruction instruction-gray">
+                        Wähle ein Gerät und tippe auf die Fläche
+                    </div>
+                    <div id="statusBadge" class="status-badge hidden"></div>
+                </div>
+
+                <div id="controlPanel" class="control-panel hidden">
+                    <button class="control-btn control-btn-blue" onclick="app.rotateItem()">
+                        Drehen
+                    </button>
+                    <button class="control-btn control-btn-green" onclick="app.addLabel()">
+                        Beschriften
+                    </button>
+                    <button class="control-btn control-btn-red" onclick="app.deleteItem()">
+                        Löschen
+                    </button>
+                </div>
+
+                <div id="labelPanel" class="label-input-panel hidden">
+                    <input type="text" id="labelInput" class="label-input" placeholder="Beschriftung eingeben...">
+                    <button class="control-btn control-btn-green" onclick="app.saveLabel()">OK</button>
+                    <button class="control-btn control-btn-gray" onclick="app.cancelLabel()">✕</button>
+                </div>
+
+                <div class="equipment-palette" id="palette"></div>
             </div>
-            <div id="statusBadge" class="status-badge hidden"></div>
-        </div>
 
-        <div id="controlPanel" class="control-panel hidden">
-            <button class="control-btn control-btn-blue" onclick="app.rotateItem()">
-                Drehen
-            </button>
-            <button class="control-btn control-btn-green" onclick="app.addLabel()">
-                Beschriften
-            </button>
-            <button class="control-btn control-btn-red" onclick="app.deleteItem()">
-                Löschen
-            </button>
+            <div class="users-sidebar">
+                <h3>
+                    <span>👥 Aktive Nutzer</span>
+                    <span id="userCount" style="margin-left: auto; background: #2563eb; color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;">0</span>
+                </h3>
+                <div id="usersList"></div>
+            </div>
         </div>
-
-        <div id="labelPanel" class="label-input-panel hidden">
-            <input type="text" id="labelInput" class="label-input" placeholder="Beschriftung eingeben...">
-            <button class="control-btn control-btn-green" onclick="app.saveLabel()">OK</button>
-            <button class="control-btn control-btn-gray" onclick="app.cancelLabel()">✕</button>
-        </div>
-
-        <div class="equipment-palette" id="palette"></div>
 
         <div id="clearModal" class="modal-overlay hidden">
             <div class="modal">
@@ -687,12 +799,15 @@
             roomId: null,
             userId: null,
             username: null,
-            isCreator: false
+            isCreator: false,
+            userColor: null
         };
         
         let websocket = null;
         let isWebSocketConnected = false;
-        let adminPassword = null; // Admin-Passwort speichern
+        let adminPassword = null;
+        let activeUsers = []; // Liste aller aktiven User
+        let userActivityTimeout = {}; // Timeout für User-Aktivität
 
         // Tab Switching
         function switchTab(tab) {
@@ -808,6 +923,7 @@
                     sessionData.userId = data.user_id;
                     sessionData.username = username;
                     sessionData.isCreator = false;
+                    sessionData.userColor = data.user_color || '#2563eb';
                     
                     if (data.room_state) {
                         console.log('📥 Lade initialen Raum-State:', data.room_state);
@@ -854,27 +970,51 @@
                 isWebSocketConnected = true;
                 updateSyncIndicator(true);
                 
-                // Optional: Sende initialen State nach Verbindung
-                if (app.state.placedItems.length > 0 || app.state.connections.length > 0) {
-                    console.log('📤 Sende initialen State nach Verbindung');
-                    sendUpdate();
-                }
+                // Sende Join-Message mit User-Info
+                websocket.send(JSON.stringify({
+                    type: 'join',
+                    username: sessionData.username,
+                    user_id: sessionData.userId,
+                    color: sessionData.userColor
+                }));
             };
 
             websocket.onmessage = (event) => {
                 console.log("📨 Empfange Update:", event.data.substring(0, 100) + '...');
                 
                 try {
-                    const data = JSON.parse(event.data);
-                    if (data.items !== undefined && data.connections !== undefined) {
-                        console.log('✅ State aktualisiert:', {
-                            items: data.items.length,
-                            connections: data.connections.length
-                        });
-                        app.state.placedItems = data.items;
-                        app.state.connections = data.connections;
-                        app.render();
-                        app.updateUI();
+                    const msg = JSON.parse(event.data);
+                    
+                    // Handle verschiedene Message-Typen
+                    if (msg.type === 'users_list') {
+                        // Initiale User-Liste
+                        activeUsers = msg.users || [];
+                        renderUsersList();
+                    } else if (msg.type === 'user_joined') {
+                        // Neuer User beigetreten
+                        console.log('👋 User beigetreten:', msg.user.username);
+                        activeUsers.push(msg.user);
+                        renderUsersList();
+                        showNotification(`${msg.user.username} ist beigetreten`, msg.user.color);
+                    } else if (msg.type === 'user_left') {
+                        // User hat verlassen
+                        activeUsers = activeUsers.filter(u => u.user_id !== msg.user_id);
+                        renderUsersList();
+                    } else if (msg.type === 'state_update') {
+                        // State-Update
+                        if (msg.state.items !== undefined && msg.state.connections !== undefined) {
+                            console.log('✅ State aktualisiert:', {
+                                items: msg.state.items.length,
+                                connections: msg.state.connections.length
+                            });
+                            app.state.placedItems = msg.state.items;
+                            app.state.connections = msg.state.connections;
+                            app.render();
+                            app.updateUI();
+                        }
+                    } else if (msg.type === 'activity') {
+                        // Activity-Event
+                        showActivityBadge(msg);
                     }
                 } catch (e) {
                     console.error('❌ Fehler beim Parsen:', e);
@@ -887,6 +1027,8 @@
                     "Reason:", event.reason);
                 isWebSocketConnected = false;
                 updateSyncIndicator(false);
+                activeUsers = [];
+                renderUsersList();
                 
                 // Optional: Automatischer Reconnect nach 3 Sekunden
                 if (sessionData.roomId) {
@@ -915,29 +1057,146 @@
             
             if (!sessionData.roomId || !websocket || websocket.readyState !== WebSocket.OPEN) {
                 console.warn('⚠️ Update NICHT gesendet! Verbindung nicht bereit.');
-                console.warn('  - Raum-ID:', sessionData.roomId);
-                console.warn('  - WebSocket:', websocket ? 'existiert' : 'null');
-                console.warn('  - ReadyState:', websocket?.readyState, '(OPEN=1)');
                 return;
             }
             
-            const payload = JSON.stringify({
-                items: app.state.placedItems,
-                connections: app.state.connections
-            });
+            const payload = {
+                type: 'state_update',
+                state: {
+                    items: app.state.placedItems,
+                    connections: app.state.connections
+                }
+            };
 
-            console.log('✉️ Sende Update:', {
-                itemCount: app.state.placedItems.length,
-                connectionCount: app.state.connections.length,
-                payloadSize: payload.length + ' Bytes'
-            });
+            console.log('✉️ Sende State Update');
             
             try {
-                websocket.send(payload);
+                websocket.send(JSON.stringify(payload));
                 console.log('✅ Update erfolgreich gesendet');
             } catch (e) {
                 console.error('❌ Fehler beim Senden:', e);
             }
+        }
+
+        function sendActivity(action, itemType) {
+            if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
+            
+            const activity = {
+                type: 'activity',
+                user_id: sessionData.userId,
+                username: sessionData.username,
+                color: sessionData.userColor,
+                action: action,
+                item_type: itemType,
+                timestamp: Date.now()
+            };
+            
+            try {
+                websocket.send(JSON.stringify(activity));
+            } catch (e) {
+                console.error('❌ Fehler beim Senden der Aktivität:', e);
+            }
+        }
+
+        function renderUsersList() {
+            const usersList = document.getElementById('usersList');
+            const userCount = document.getElementById('userCount');
+            
+            // Füge eigenen User hinzu wenn nicht vorhanden
+            const selfExists = activeUsers.some(u => u.user_id === sessionData.userId);
+            let allUsers = [...activeUsers];
+            if (!selfExists && sessionData.userId) {
+                allUsers.unshift({
+                    user_id: sessionData.userId,
+                    username: sessionData.username,
+                    color: sessionData.userColor,
+                    isSelf: true
+                });
+            }
+            
+            userCount.textContent = allUsers.length;
+            
+            if (allUsers.length === 0) {
+                usersList.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 1rem;">Keine Nutzer online</div>';
+                return;
+            }
+            
+            usersList.innerHTML = allUsers.map(user => {
+                const isActive = userActivityTimeout[user.user_id];
+                const initials = user.username.substring(0, 2).toUpperCase();
+                
+                return `
+                    <div class="user-item ${isActive ? 'active' : ''}">
+                        <div class="user-avatar" style="background-color: ${user.color};">
+                            ${initials}
+                        </div>
+                        <div class="user-info">
+                            <div class="user-name">
+                                ${user.username}${user.isSelf ? ' (Du)' : ''}
+                            </div>
+                            <div class="user-status">
+                                ${isActive ? '🖱️ Aktiv' : '💤 Ruhig'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showNotification(message, color) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 5rem;
+                right: 2rem;
+                background: ${color};
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 0.5rem;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                font-weight: 500;
+                z-index: 1000;
+                animation: slideIn 0.3s;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        function showActivityBadge(activity) {
+            // Zeige kurz an, was der andere User macht
+            const badge = document.createElement('div');
+            badge.className = 'activity-badge';
+            badge.style.borderColor = activity.color;
+            badge.style.color = activity.color;
+            badge.textContent = `${activity.username}: ${activity.action}`;
+            
+            // Position in der Mitte oben
+            badge.style.top = '6rem';
+            badge.style.left = '50%';
+            badge.style.transform = 'translateX(-50%)';
+            
+            document.getElementById('activityBadges').appendChild(badge);
+            
+            // Markiere User als aktiv
+            userActivityTimeout[activity.user_id] = true;
+            renderUsersList();
+            
+            // Nach 2 Sekunden entfernen
+            setTimeout(() => {
+                badge.style.animation = 'fadeOut 0.3s';
+                setTimeout(() => badge.remove(), 300);
+            }, 2000);
+            
+            // User-Aktivität nach 5 Sekunden zurücksetzen
+            setTimeout(() => {
+                delete userActivityTimeout[activity.user_id];
+                renderUsersList();
+            }, 5000);
         }
 
         function showRoomInfo() {
@@ -1324,6 +1583,7 @@
 
             placeItem(x, y) {
                 console.log('➕ Platziere Item:', this.state.selectedTool, 'bei', x, y);
+                const equipment = this.equipment.find(e => e.id === this.state.selectedTool);
                 const newItem = {
                     id: Date.now(),
                     type: this.state.selectedTool,
@@ -1338,6 +1598,7 @@
                 this.render();
                 this.updateUI();
                 sendUpdate();
+                sendActivity('platziert ' + (equipment?.name || this.state.selectedTool), this.state.selectedTool);
             },
 
             handleConnection(item) {
@@ -1358,6 +1619,7 @@
                     this.render();
                     this.updateUI();
                     sendUpdate();
+                    sendActivity('verbindet Geräte', 'connection');
                 }
             },
 
@@ -1426,6 +1688,12 @@
             handleEnd() {
                 if (this.state.isDragging || this.state.isResizing) {
                     console.log('📤 Sende Update nach Drag/Resize');
+                    const equipment = this.equipment.find(e => e.id === this.state.selectedItem?.type);
+                    if (this.state.isDragging) {
+                        sendActivity('verschiebt ' + (equipment?.name || 'Objekt'), this.state.selectedItem?.type);
+                    } else if (this.state.isResizing) {
+                        sendActivity('skaliert ' + (equipment?.name || 'Objekt'), this.state.selectedItem?.type);
+                    }
                     sendUpdate();
                 }
                 this.state.isDragging = false;
@@ -1438,12 +1706,15 @@
                 console.log('🔄 Drehe Item:', this.state.selectedItem.type);
                 this.state.selectedItem.rotation = (this.state.selectedItem.rotation + 90) % 360;
                 this.render();
+                const equipment = this.equipment.find(e => e.id === this.state.selectedItem.type);
+                sendActivity('dreht ' + (equipment?.name || 'Objekt'), this.state.selectedItem.type);
                 sendUpdate();
             },
 
             deleteItem() {
                 if (!this.state.selectedItem) return;
                 console.log('🗑️ Lösche Item:', this.state.selectedItem.type);
+                const equipment = this.equipment.find(e => e.id === this.state.selectedItem.type);
                 this.state.connections = this.state.connections.filter(conn => 
                     conn.from !== this.state.selectedItem.id && conn.to !== this.state.selectedItem.id
                 );
@@ -1453,6 +1724,7 @@
                 this.state.selectedItem = null;
                 this.render();
                 this.updateUI();
+                sendActivity('löscht ' + (equipment?.name || 'Objekt'), equipment?.id || 'unknown');
                 sendUpdate();
             },
 
