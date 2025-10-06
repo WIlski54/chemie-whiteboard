@@ -1255,7 +1255,14 @@ const app = {
 };
 
 // Event Listeners beim Laden registrieren
-document.addEventListener('DOMContentLoaded', function() {
+// Event Listeners beim Laden registrieren
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initEventListeners);
+} else {
+    initEventListeners();
+}
+
+function initEventListeners() {
     console.log('📱 DOM geladen, registriere Event Listeners...');
     
     const createForm = document.getElementById('createForm');
@@ -1284,10 +1291,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     console.log('✅ Alle Event Listeners registriert');
-});
+}
 
 // iOS Touch-Event Fix
 if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     console.log('📱 iOS Device erkannt - aktiviere Touch-Fixes');
     document.addEventListener('touchstart', function(){}, {passive: true});
+
 }
