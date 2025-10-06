@@ -2132,9 +2132,41 @@ async exportToPDF(mode = 'fit') {
                 }
             }
         };
+        <script>
+  // iOS-Fallback: Wenn aus irgendeinem Grund der Submit nicht feuert,
+  // rufen wir createRoom beim Button-Klick direkt auf.
+  (function wireIOSCreateFallback(){
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const btn = document.getElementById('createBtn');
+    const form = document.getElementById('form-create');
+
+    if (form && !form.dataset.bound) {
+      // Sicherheit: echtes Submit-Event binden (falls onsubmit entfernt wurde)
+      form.addEventListener('submit', (e) => createRoom(e));
+      form.dataset.bound = "1";
+    }
+    if (isIOS && btn && !btn.dataset.bound) {
+      btn.addEventListener('click', (e) => {
+        // Wenn wir noch im Login sind und kein Raum aktiv ist, lieber direkt
+        if (!window.sessionData?.roomId) {
+          e.preventDefault();
+          createRoom(e);
+        }
+      });
+      btn.dataset.bound = "1";
+    }
+  })();
+
+  // Ganz wichtig: Globale Pointer-Blocker auf Canvas beschränken!
+  // Falls du sowas hast wie:
+  // document.addEventListener('touchmove', e => e.preventDefault(), {passive:false})
+  // dann NUR auf die Canvas/Stage registrieren – nie global auf document/body.
+</script>
+
     </script>
 </body>
 </html>
+
 
 
 
