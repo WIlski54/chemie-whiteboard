@@ -732,7 +732,8 @@ const app = {
     handleCanvasClick(e) {
         if (this.state.isDragging || this.state.isResizing) return;
 
-        const rect = document.getElementById('canvas').getBoundingClientRect();
+        const canvas = document.getElementById('canvas');
+        const rect = canvas.getBoundingClientRect();
         const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
         const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
 
@@ -755,20 +756,24 @@ const app = {
                 this.updateUI();
             }
         } else if (this.state.selectedTool) {
-            this.placeItem(x, y);
+            // Konvertiere absolute Pixel zu relativen Koordinaten (0-1)
+            const relativeX = x / rect.width;
+            const relativeY = y / rect.height;
+            this.placeItem(relativeX, relativeY);
         } else {
             this.state.selectedItem = null;
             this.updateUI();
         }
     },
 
-    placeItem(x, y) {
-        console.log('➕ Platziere Item:', this.state.selectedTool, 'bei', x, y);
+    placeItem(relX, relY) {
+        console.log('➕ Platziere Item:', this.state.selectedTool, 'bei', Math.round(relX*100)+'%', Math.round(relY*100)+'%');
         const equipment = this.equipment.find(e => e.id === this.state.selectedTool);
         const newItem = {
             id: Date.now(),
             type: this.state.selectedTool,
-            x, y,
+            x: relX,  // Relative Koordinaten 0-1
+            y: relY,  // Relative Koordinaten 0-1
             rotation: 0,
             scale: 1,
             label: ''
@@ -811,13 +816,21 @@ const app = {
         const item = this.state.placedItems.find(i => i.id === itemId);
         if (!item) return;
 
-        const rect = document.getElementById('canvas').getBoundingClientRect();
+        const canvas = document.getElementById('canvas');
+        const rect = canvas.getBoundingClientRect();
         const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
         const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
 
+        // Konvertiere zu relativen Koordinaten
+        const relX = x / rect.width;
+        const relY = y / rect.height;
+
         this.state.selectedItem = item;
         this.state.isDragging = true;
-        this.state.dragOffset = { x: x - item.x, y: y - item.y };
+        this.state.dragOffset = { 
+            x: relX - item.x, 
+            y: relY - item.y 
+        };
         this.updateUI();
     },
 
@@ -828,28 +841,31 @@ const app = {
         const item = this.state.placedItems.find(i => i.id === itemId);
         if (!item) return;
 
-        const rect = document.getElementById('canvas').getBoundingClientRect();
+        const canvas = document.getElementById('canvas');
+        const rect = canvas.getBoundingClientRect();
         const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
         const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
 
         this.state.selectedItem = item;
         this.state.isResizing = true;
         this.state.initialScale = item.scale || 1;
-        this.state.resizeStartPos = { x, y };
+        this.state.resizeStartPos = { x, y };  // Bleibt absolut für Delta-Berechnung
         this.updateUI();
     },
 
     handleMove(e) {
         if ((!this.state.isDragging && !this.state.isResizing) || !this.state.selectedItem) return;
 
-        const rect = document.getElementById('canvas').getBoundingClientRect();
+        const canvas = document.getElementById('canvas');
+        const rect = canvas.getBoundingClientRect();
         const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
         const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
 
         if (this.state.isResizing) {
             e.preventDefault();
-            const deltaX = x - this.state.resizeStartPos.x;
-            const deltaY = y - this.state.resizeStartPos.y;
+            // Resizing bleibt gleich - arbeitet mit absoluten Pixeln für Delta
+            const deltaX = x - (this.state.resizeStartPos.x || 0);
+            const deltaY = y - (this.state.resizeStartPos.y || 0);
             const delta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
             const direction = (deltaX + deltaY) > 0 ? 1 : -1;
             const scaleFactor = 1 + (direction * delta * 0.003);
@@ -858,8 +874,11 @@ const app = {
             this.state.selectedItem.scale = newScale;
         } else if (this.state.isDragging) {
             e.preventDefault();
-            this.state.selectedItem.x = x - this.state.dragOffset.x;
-            this.state.selectedItem.y = y - this.state.dragOffset.y;
+            // Konvertiere zu relativen Koordinaten
+            const relX = x / rect.width;
+            const relY = y / rect.height;
+            this.state.selectedItem.x = Math.max(0, Math.min(1, relX - this.state.dragOffset.x));
+            this.state.selectedItem.y = Math.max(0, Math.min(1, relY - this.state.dragOffset.y));
         }
 
         this.render();
@@ -1121,16 +1140,26 @@ const app = {
 
     renderItems() {
         const container = document.getElementById('itemsContainer');
+        const canvas = document.getElementById('canvas');
+        const canvasWidth = canvas.clientWidth;
+        const canvasHeight = canvas.clientHeight;
+        
         container.innerHTML = this.state.placedItems.map(item => {
             const equipment = this.equipment.find(e => e.id === item.type);
             if (!equipment) return '';
+            
             const size = 80 * (item.scale || 1);
+            
+            // Konvertiere relative (0-1) zu absolute Pixel-Koordinaten
+            const absoluteX = item.x * canvasWidth;
+            const absoluteY = item.y * canvasHeight;
+            
             const isSelected = this.state.selectedItem?.id === item.id;
             const isDragging = this.state.isDragging && isSelected;
             
             return `
                 <div class="item ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}"
-                     style="left: ${item.x - size/2}px; top: ${item.y - size/2}px; width: ${size}px; height: ${size}px;"
+                     style="left: ${absoluteX - size/2}px; top: ${absoluteY - size/2}px; width: ${size}px; height: ${size}px;"
                      data-id="${item.id}"
                      onmousedown="app.startDrag(event, ${item.id})"
                      ontouchstart="app.startDrag(event, ${item.id})">
@@ -1154,21 +1183,31 @@ const app = {
 
     renderConnections() {
         const svg = document.getElementById('connectionsSvg');
+        const canvas = document.getElementById('canvas');
+        const canvasWidth = canvas.clientWidth;
+        const canvasHeight = canvas.clientHeight;
+        
         svg.innerHTML = this.state.connections.map(conn => {
             const fromItem = this.state.placedItems.find(item => item.id === conn.from);
             const toItem = this.state.placedItems.find(item => item.id === conn.to);
             
             if (!fromItem || !toItem) return '';
             
+            // Konvertiere relative zu absoluten Koordinaten
+            const fromX = fromItem.x * canvasWidth;
+            const fromY = fromItem.y * canvasHeight;
+            const toX = toItem.x * canvasWidth;
+            const toY = toItem.y * canvasHeight;
+            
             return `
                 <g>
-                    <line x1="${fromItem.x}" y1="${fromItem.y}" 
-                          x2="${toItem.x}" y2="${toItem.y}" 
+                    <line x1="${fromX}" y1="${fromY}" 
+                          x2="${toX}" y2="${toY}" 
                           stroke="#2563eb" stroke-width="3" 
                           stroke-dasharray="${conn.type === 'dashed' ? '8,4' : 'none'}"/>
                     <line class="connection-line" 
-                          x1="${fromItem.x}" y1="${fromItem.y}" 
-                          x2="${toItem.x}" y2="${toItem.y}" 
+                          x1="${fromX}" y1="${fromY}" 
+                          x2="${toX}" y2="${toY}" 
                           stroke="transparent" stroke-width="20" 
                           style="cursor: pointer; pointer-events: auto;"
                           onclick="app.deleteConnection(${conn.id})"/>
@@ -1255,14 +1294,7 @@ const app = {
 };
 
 // Event Listeners beim Laden registrieren
-// Event Listeners beim Laden registrieren
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initEventListeners);
-} else {
-    initEventListeners();
-}
-
-function initEventListeners() {
+document.addEventListener('DOMContentLoaded', function() {
     console.log('📱 DOM geladen, registriere Event Listeners...');
     
     const createForm = document.getElementById('createForm');
@@ -1291,11 +1323,10 @@ function initEventListeners() {
     }
     
     console.log('✅ Alle Event Listeners registriert');
-}
+});
 
 // iOS Touch-Event Fix
 if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     console.log('📱 iOS Device erkannt - aktiviere Touch-Fixes');
     document.addEventListener('touchstart', function(){}, {passive: true});
-
 }
