@@ -116,6 +116,7 @@
             font-weight: 600;
             cursor: pointer;
             transition: background 0.2s;
+            touch-action: manipulation;
         }
 
         .btn-primary:hover {
@@ -158,8 +159,8 @@
 
         .users-sidebar {
             width: 250px;
-            min-width: 250px;        /* NEU */
-            flex-shrink: 0;          /* NEU */
+            min-width: 250px;
+            flex-shrink: 0;
             background-color: #f9fafb;
             border-left: 4px solid #e5e7eb;
             overflow-y: auto;
@@ -615,54 +616,31 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
-        /* --- Sidebar sichtbar machen und im Flex-Layout verankern --- */
-.main-content{
-  display: flex;        
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-.canvas-area{
-  flex: 1 1 auto;       
-  min-width: 0;
-}
-.users-sidebar{
-  flex: 0 0 250px !important;   
-  width: 250px !important;
-  min-width: 250px !important;
-  display: block !important;
-  background: #f9fafb;
-  border-left: 4px solid #e5e7eb;
-  overflow-y: auto;
-  padding: 1rem;
-  position: relative;
-  z-index: 5;
-}
-/* Debugrahmen: kurz aktiv lassen, um Sichtbarkeit zu prüfen */
-/* .users-sidebar{ outline:3px solid #ef4444; } */
-/* iPad: Login muss ganz oben liegen und Events annehmen */
-.login-screen,
-.login-container,
-.tab-content,
-.btn-primary {
-  position: relative;
-  z-index: 1000;
-  pointer-events: auto;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation; /* vermeidet 300ms Delay/Zoom */
-}
 
-/* Versteckte Overlays dürfen niemals Events abfangen */
-.hidden { display: none !important; }
-.modal-overlay.hidden,
-#clearModal.hidden {
-  display: none !important;
-  pointer-events: none !important;
-}
+        .main-content {
+            display: flex;        
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
 
-/* Solange die App nicht aktiv ist, fängt sie keine Events ab */
-.app:not(.active) { pointer-events: none; }
+        .canvas-area {
+            flex: 1 1 auto;       
+            min-width: 0;
+        }
 
+        .users-sidebar {
+            flex: 0 0 250px !important;   
+            width: 250px !important;
+            min-width: 250px !important;
+            display: block !important;
+            background: #f9fafb;
+            border-left: 4px solid #e5e7eb;
+            overflow-y: auto;
+            padding: 1rem;
+            position: relative;
+            z-index: 5;
+        }
     </style>
 </head>
 <body>
@@ -674,11 +652,11 @@
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('create')">Raum erstellen</button>
                 <button class="tab" onclick="switchTab('join')">Raum beitreten</button>
-                <button class="tab" onclick="switchTab('admin')">🔐 Lehrermodus</button>
+                <button class="tab" onclick="switchTab('admin')">🔒 Lehrermodus</button>
             </div>
 
             <div class="tab-content active" id="createTab">
-                <form onsubmit="createRoom(event)">
+                <form id="createForm">
                     <div class="form-group">
                         <label>Dein Name</label>
                         <input type="text" id="createName" placeholder="z.B. Herr Müller" required>
@@ -695,7 +673,7 @@
             </div>
 
             <div class="tab-content" id="joinTab">
-                <form onsubmit="joinRoom(event)">
+                <form id="joinForm">
                     <div class="form-group">
                         <label>Dein Name</label>
                         <input type="text" id="joinName" placeholder="z.B. Max Mustermann" required>
@@ -712,7 +690,7 @@
             </div>
 
             <div class="tab-content" id="adminTab">
-                <form onsubmit="adminLogin(event)">
+                <form id="adminForm">
                     <div class="form-group">
                         <label>Lehrer-Passwort</label>
                         <input type="password" id="adminPassword" placeholder="Passwort eingeben" required>
@@ -730,7 +708,7 @@
     <div class="app" id="adminApp" style="display: none;">
         <div class="header">
             <div class="header-left">
-                <h1>🔐 Admin-Übersicht</h1>
+                <h1>🔒 Admin-Übersicht</h1>
             </div>
             <div class="header-buttons">
                 <button class="btn btn-white" onclick="refreshAdminData()">🔄 Aktualisieren</button>
@@ -741,7 +719,6 @@
         <div style="flex: 1; overflow-y: auto; padding: 2rem; background-color: #f9fafb;">
             <div style="max-width: 1200px; margin: 0 auto;">
                 <div id="adminStats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-                    <!-- Stats werden hier eingefügt -->
                 </div>
 
                 <div style="background: white; border-radius: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
@@ -749,7 +726,6 @@
                         <h2 style="font-size: 1.25rem; font-weight: bold; color: #1f2937;">Aktive Räume</h2>
                     </div>
                     <div id="adminRoomsList" style="padding: 1rem;">
-                        <!-- Räume werden hier eingefügt -->
                     </div>
                 </div>
             </div>
@@ -856,8 +832,8 @@
         let websocket = null;
         let isWebSocketConnected = false;
         let adminPassword = null;
-        let activeUsers = []; // Liste aller aktiven User
-        let userActivityTimeout = {}; // Timeout für User-Aktivität
+        let activeUsers = [];
+        let userActivityTimeout = {};
 
         // Tab Switching
         function switchTab(tab) {
@@ -939,10 +915,10 @@
                 console.log('✅ Join Response:', data);
                 
                 if (data.success) {
-    sessionData.userId = data.user_id;
-    sessionData.userColor = data.user_color || '#2563eb';
-    startWhiteboard();
-}
+                    sessionData.userId = data.user_id;
+                    sessionData.userColor = data.user_color || '#2563eb';
+                    startWhiteboard();
+                }
             } catch (error) {
                 console.error('❌ Fehler beim Beitreten:', error);
             }
@@ -1005,10 +981,8 @@
             app.render();
             app.updateUI();
             
-            // WebSocket-Verbindung herstellen
             startWebSocketConnection();
-             // Initiales Rendern der User-Liste
-    renderUsersList();  // <-- DIESE ZEILE HINZUFÜGEN
+            renderUsersList();
         }
         
         function startWebSocketConnection() {
@@ -1023,7 +997,6 @@
                 isWebSocketConnected = true;
                 updateSyncIndicator(true);
                 
-                // Sende Join-Message mit User-Info
                 websocket.send(JSON.stringify({
                     type: 'join',
                     username: sessionData.username,
@@ -1038,23 +1011,18 @@
                 try {
                     const msg = JSON.parse(event.data);
                     
-                    // Handle verschiedene Message-Typen
                     if (msg.type === 'users_list') {
-                        // Initiale User-Liste
                         activeUsers = msg.users || [];
                         renderUsersList();
                     } else if (msg.type === 'user_joined') {
-                        // Neuer User beigetreten
                         console.log('👋 User beigetreten:', msg.user.username);
                         activeUsers.push(msg.user);
                         renderUsersList();
                         showNotification(`${msg.user.username} ist beigetreten`, msg.user.color);
                     } else if (msg.type === 'user_left') {
-                        // User hat verlassen
                         activeUsers = activeUsers.filter(u => u.user_id !== msg.user_id);
                         renderUsersList();
                     } else if (msg.type === 'state_update') {
-                        // State-Update
                         if (msg.state.items !== undefined && msg.state.connections !== undefined) {
                             console.log('✅ State aktualisiert:', {
                                 items: msg.state.items.length,
@@ -1066,7 +1034,6 @@
                             app.updateUI();
                         }
                     } else if (msg.type === 'activity') {
-                        // Activity-Event
                         showActivityBadge(msg);
                     }
                 } catch (e) {
@@ -1083,13 +1050,12 @@
                 activeUsers = [];
                 renderUsersList();
                 
-                // Optional: Automatischer Reconnect nach 3 Sekunden
                 if (sessionData.roomId) {
                     console.log('🔄 Versuche Reconnect in 3 Sekunden...');
                     setTimeout(() => {
                         console.log('🔄 Reconnect...');
                         startWebSocketConnection();
-      renderUsersList(); // inserted for initial sidebar render
+                        renderUsersList();
                     }, 3000);
                 }
             };
@@ -1156,7 +1122,6 @@
             const usersList = document.getElementById('usersList');
             const userCount = document.getElementById('userCount');
             
-            // Füge eigenen User hinzu wenn nicht vorhanden
             const selfExists = activeUsers.some(u => u.user_id === sessionData.userId);
             let allUsers = [...activeUsers];
             if (!selfExists && sessionData.userId) {
@@ -1222,31 +1187,26 @@
         }
 
         function showActivityBadge(activity) {
-            // Zeige kurz an, was der andere User macht
             const badge = document.createElement('div');
             badge.className = 'activity-badge';
             badge.style.borderColor = activity.color;
             badge.style.color = activity.color;
             badge.textContent = `${activity.username}: ${activity.action}`;
             
-            // Position in der Mitte oben
             badge.style.top = '6rem';
             badge.style.left = '50%';
             badge.style.transform = 'translateX(-50%)';
             
             document.getElementById('activityBadges').appendChild(badge);
             
-            // Markiere User als aktiv
             userActivityTimeout[activity.user_id] = true;
             renderUsersList();
             
-            // Nach 2 Sekunden entfernen
             setTimeout(() => {
                 badge.style.animation = 'fadeOut 0.3s';
                 setTimeout(() => badge.remove(), 300);
             }, 2000);
             
-            // User-Aktivität nach 5 Sekunden zurücksetzen
             setTimeout(() => {
                 delete userActivityTimeout[activity.user_id];
                 renderUsersList();
@@ -1263,7 +1223,7 @@
             event.preventDefault();
             const password = document.getElementById('adminPassword').value;
             
-            console.log('🔐 Admin-Login Versuch');
+            console.log('🔒 Admin-Login Versuch');
             
             try {
                 const response = await fetch(`${API_URL}/admin/login`, {
@@ -1291,7 +1251,6 @@
             document.getElementById('adminApp').style.display = 'flex';
             refreshAdminData();
             
-            // Auto-refresh alle 5 Sekunden
             setInterval(refreshAdminData, 5000);
         }
 
@@ -1341,7 +1300,7 @@
             if (rooms.length === 0) {
                 document.getElementById('adminRoomsList').innerHTML = `
                     <div style="text-align: center; padding: 3rem; color: #9ca3af;">
-                        <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">🔭</div>
                         <div>Keine aktiven Räume vorhanden</div>
                     </div>
                 `;
@@ -1506,7 +1465,6 @@
             },
 
             equipment: [
-                // Glasgeräte I
                 { id: 'becherglas', name: 'Becherglas', img: `<img src="images/becherglas.png" alt="Becherglas" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'erlenmeyerkolben', name: 'Erlenmeyerkolben', img: `<img src="images/erlenmeyerkolben.png" alt="Erlenmeyerkolben" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'reagenzglas', name: 'Reagenzglas', img: `<img src="images/reagenzglas.png" alt="Reagenzglas" style="width:100%; height:100%; object-fit:contain;">` },
@@ -1515,8 +1473,6 @@
                 { id: 'stehkolben', name: 'Stehkolben', img: `<img src="images/stehkolben.png" alt="Stehkolben" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'spitzkolben', name: 'Spitzkolben', img: `<img src="images/spitzkolben.png" alt="Spitzkolben" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'saugflasche', name: 'Saugflasche', img: `<img src="images/saugflasche.png" alt="Saugflasche" style="width:100%; height:100%; object-fit:contain;">` },
-                
-                // Glasgeräte II
                 { id: 'trichter', name: 'Trichter', img: `<img src="images/trichter.png" alt="Trichter" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'tropftrichter', name: 'Tropftrichter', img: `<img src="images/tropftrichter.png" alt="Tropftrichter" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'uhrglas', name: 'Uhrglas', img: `<img src="images/uhrglas.png" alt="Uhrglas" style="width:100%; height:100%; object-fit:contain;">` },
@@ -1524,27 +1480,19 @@
                 { id: 'spritzflasche', name: 'Spritzflasche', img: `<img src="images/spritzflasche.png" alt="Spritzflasche" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'liebigkuehler', name: 'Liebigkühler', img: `<img src="images/liebigkuehler.png" alt="Liebigkühler" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'u-rohr', name: 'U-Rohr', img: `<img src="images/urohr.png" alt="U-Rohr" style="width:100%; height:100%; object-fit:contain;">` },
-                
-                // Messinstrumente
                 { id: 'pipette', name: 'Pipette', img: `<img src="images/pipette.png" alt="Pipette" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'buerette', name: 'Bürette', img: `<img src="images/buerette.png" alt="Bürette" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'kolbenprober', name: 'Kolbenprober', img: `<img src="images/kolbenprober.png" alt="Kolbenprober" style="width:100%; height:100%; object-fit:contain;">` },
-                
-                // Stativmaterial
                 { id: 'stativ', name: 'Stativ', img: `<img src="images/stativ.png" alt="Stativ" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'stativring', name: 'Stativring', img: `<img src="images/stativring.png" alt="Stativring" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'stativklammer', name: 'Stativklammer', img: `<img src="images/stativklammer.png" alt="Stativklammer" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'muffe', name: 'Muffe', img: `<img src="images/muffe.png" alt="Muffe" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'reagenzglasgestell', name: 'Reagenzglasgestell', img: `<img src="images/reagenzglasgestell.png" alt="Reagenzglasgestell" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'reagenzglasklammer', name: 'Reagenzglasklammer', img: `<img src="images/reagenzglasklammer.png" alt="Reagenzglasklammer" style="width:100%; height:100%; object-fit:contain;">` },
-
-                // Erhitzen
                 { id: 'gasbrenner', name: 'Gasbrenner', img: `<img src="images/gasbrenner.png" alt="Gasbrenner" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'dreifuss', name: 'Dreifuß', img: `<img src="images/dreifuss.png" alt="Dreifuß" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'mineralfasernetz', name: 'Mineralfasernetz', img: `<img src="images/mineralfasernetz.png" alt="Mineralfasernetz" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'tondreieck', name: 'Tondreieck', img: `<img src="images/tondreieck.png" alt="Tondreieck" style="width:100%; height:100%; object-fit:contain;">` },
-
-                // Porzellan & Werkzeuge
                 { id: 'abdampfschale', name: 'Abdampfschale', img: `<img src="images/abdampfschale.png" alt="Abdampfschale" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'moerserschale', name: 'Mörserschale', img: `<img src="images/moerserschale.png" alt="Mörserschale" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'pistill', name: 'Pistill', img: `<img src="images/pistill.png" alt="Pistill" style="width:100%; height:100%; object-fit:contain;">` },
@@ -1552,8 +1500,6 @@
                 { id: 'tiegelzange', name: 'Tiegelzange', img: `<img src="images/tiegelzange.png" alt="Tiegelzange" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'spatel', name: 'Spatel', img: `<img src="images/spatel.png" alt="Spatel" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'loeffel', name: 'Verbrennungslöffel', img: `<img src="images/loeffel.png" alt="Löffel" style="width:100%; height:100%; object-fit:contain;">` },
-                
-                // Sonstiges
                 { id: 'schutzbrille', name: 'Schutzbrille', img: `<img src="images/schutzbrille.png" alt="Schutzbrille" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'stopfen', name: 'Stopfen', img: `<img src="images/stopfen.png" alt="Stopfen" style="width:100%; height:100%; object-fit:contain;">` },
                 { id: 'wasserstrahlpumpe', name: 'Wasserstrahlpumpe', img: `<img src="images/wasserstrahlpumpe.png" alt="Wasserstrahlpumpe" style="width:100%; height:100%; object-fit:contain;">` }
@@ -1908,90 +1854,84 @@
                 event.target.value = '';
             },
 
-           // =======================================
-// Verbesserte Exportfunktion für PDF
-// =======================================
-async exportToPDF(mode = 'fit') {
-  if (this.state.isExporting) return;
-  console.log("📄 Exportiere zu PDF …");
-  this.state.isExporting = true;
+            async exportToPDF(mode = 'fit') {
+                if (this.state.isExporting) return;
+                console.log("📄 Exportiere zu PDF ...");
+                this.state.isExporting = true;
 
-  const pdfBtn = document.getElementById('pdfBtn');
-  const pdfBtnText = document.getElementById('pdfBtnText');
-  pdfBtn.disabled = true;
-  pdfBtnText.textContent = 'Erstelle PDF …';
+                const pdfBtn = document.getElementById('pdfBtn');
+                const pdfBtnText = document.getElementById('pdfBtnText');
+                pdfBtn.disabled = true;
+                pdfBtnText.textContent = 'Erstelle PDF ...';
 
-  try {
-    const stage = document.getElementById('canvas') || document.getElementById('stage');
-    if (!stage) throw new Error('Stage nicht gefunden');
+                try {
+                    const stage = document.getElementById('canvas') || document.getElementById('stage');
+                    if (!stage) throw new Error('Stage nicht gefunden');
 
-    // Screenshot mit höherer Auflösung
-    const canvas = await html2canvas(stage, {
-      backgroundColor: '#ffffff',
-      scale: 2
-    });
-    const imgData = canvas.toDataURL('image/png');
+                    const canvas = await html2canvas(stage, {
+                        backgroundColor: '#ffffff',
+                        scale: 2
+                    });
+                    const imgData = canvas.toDataURL('image/png');
 
-    const cw = canvas.width;
-    const ch = canvas.height;
-    const landscape = cw >= ch;
+                    const cw = canvas.width;
+                    const ch = canvas.height;
+                    const landscape = cw >= ch;
 
-    const { jsPDF } = window.jspdf;
+                    const { jsPDF } = window.jspdf;
 
-    if (mode === 'true') {
-      // 1:1-Export im Original-Seitenverhältnis
-      const pxToPt = 72 / 96; // Umrechnung px → pt
-      const pdfW = cw * pxToPt;
-      const pdfH = ch * pxToPt;
+                    if (mode === 'true') {
+                        const pxToPt = 72 / 96;
+                        const pdfW = cw * pxToPt;
+                        const pdfH = ch * pxToPt;
 
-      const pdf = new jsPDF({
-        orientation: landscape ? 'l' : 'p',
-        unit: 'pt',
-        format: [pdfW, pdfH]
-      });
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
-      pdf.save(`versuchsaufbau_original_${Date.now()}.pdf`);
-    } else {
-      // A4-Export mit proportionaler Skalierung
-      const pdf = new jsPDF({
-        orientation: landscape ? 'l' : 'p',
-        unit: 'pt',
-        format: 'a4'
-      });
+                        const pdf = new jsPDF({
+                            orientation: landscape ? 'l' : 'p',
+                            unit: 'pt',
+                            format: [pdfW, pdfH]
+                        });
+                        pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
+                        pdf.save(`versuchsaufbau_original_${Date.now()}.pdf`);
+                    } else {
+                        const pdf = new jsPDF({
+                            orientation: landscape ? 'l' : 'p',
+                            unit: 'pt',
+                            format: 'a4'
+                        });
 
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const margin = 24;
+                        const pageW = pdf.internal.pageSize.getWidth();
+                        const pageH = pdf.internal.pageSize.getHeight();
+                        const margin = 24;
 
-      const maxW = pageW - 2 * margin;
-      const maxH = pageH - 2 * margin;
+                        const maxW = pageW - 2 * margin;
+                        const maxH = pageH - 2 * margin;
 
-      let renderW = maxW;
-      let renderH = (ch / cw) * renderW;
-      if (renderH > maxH) {
-        renderH = maxH;
-        renderW = (cw / ch) * renderH;
-      }
-      const x = (pageW - renderW) / 2;
-      const y = (pageH - renderH) / 2;
+                        let renderW = maxW;
+                        let renderH = (ch / cw) * renderW;
+                        if (renderH > maxH) {
+                            renderH = maxH;
+                            renderW = (cw / ch) * renderH;
+                        }
+                        const x = (pageW - renderW) / 2;
+                        const y = (pageH - renderH) / 2;
 
-      pdf.addImage(imgData, 'PNG', x, y, renderW, renderH);
-      const timestamp = new Date().toLocaleString('de-DE');
-      pdf.setFontSize(10);
-      pdf.text(`Versuchsaufbau – Exportiert am ${timestamp}`, margin, pageH - 20);
-      pdf.save(`versuchsaufbau_A4_${Date.now()}.pdf`);
-    }
+                        pdf.addImage(imgData, 'PNG', x, y, renderW, renderH);
+                        const timestamp = new Date().toLocaleString('de-DE');
+                        pdf.setFontSize(10);
+                        pdf.text(`Versuchsaufbau – Exportiert am ${timestamp}`, margin, pageH - 20);
+                        pdf.save(`versuchsaufbau_A4_${Date.now()}.pdf`);
+                    }
 
-    console.log("✅ PDF erfolgreich exportiert");
-  } catch (error) {
-    console.error("❌ Fehler beim PDF-Export:", error);
-    alert("Fehler beim PDF-Export.");
-  } finally {
-    this.state.isExporting = false;
-    pdfBtn.disabled = false;
-    pdfBtnText.textContent = 'PDF Export';
-  }
-},
+                    console.log("✅ PDF erfolgreich exportiert");
+                } catch (error) {
+                    console.error("❌ Fehler beim PDF-Export:", error);
+                    alert("Fehler beim PDF-Export.");
+                } finally {
+                    this.state.isExporting = false;
+                    pdfBtn.disabled = false;
+                    pdfBtnText.textContent = 'PDF Export';
+                }
+            },
 
             render() {
                 this.renderItems();
@@ -2132,43 +2072,44 @@ async exportToPDF(mode = 'fit') {
                 }
             }
         };
-        <script>
-  // iOS-Fallback: Wenn aus irgendeinem Grund der Submit nicht feuert,
-  // rufen wir createRoom beim Button-Klick direkt auf.
-  (function wireIOSCreateFallback(){
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const btn = document.getElementById('createBtn');
-    const form = document.getElementById('form-create');
 
-    if (form && !form.dataset.bound) {
-      // Sicherheit: echtes Submit-Event binden (falls onsubmit entfernt wurde)
-      form.addEventListener('submit', (e) => createRoom(e));
-      form.dataset.bound = "1";
-    }
-    if (isIOS && btn && !btn.dataset.bound) {
-      btn.addEventListener('click', (e) => {
-        // Wenn wir noch im Login sind und kein Raum aktiv ist, lieber direkt
-        if (!window.sessionData?.roomId) {
-          e.preventDefault();
-          createRoom(e);
+        // Event Listeners beim Laden registrieren
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📱 DOM geladen, registriere Event Listeners...');
+            
+            const createForm = document.getElementById('createForm');
+            const joinForm = document.getElementById('joinForm');
+            const adminForm = document.getElementById('adminForm');
+            
+            if (createForm) {
+                console.log('✅ Create Form gefunden');
+                createForm.addEventListener('submit', createRoom);
+            } else {
+                console.error('❌ Create Form NICHT gefunden!');
+            }
+            
+            if (joinForm) {
+                console.log('✅ Join Form gefunden');
+                joinForm.addEventListener('submit', joinRoom);
+            } else {
+                console.error('❌ Join Form NICHT gefunden!');
+            }
+            
+            if (adminForm) {
+                console.log('✅ Admin Form gefunden');
+                adminForm.addEventListener('submit', adminLogin);
+            } else {
+                console.error('❌ Admin Form NICHT gefunden!');
+            }
+            
+            console.log('✅ Alle Event Listeners registriert');
+        });
+
+        // iOS Touch-Event Fix
+        if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+            console.log('📱 iOS Device erkannt - aktiviere Touch-Fixes');
+            document.addEventListener('touchstart', function(){}, {passive: true});
         }
-      });
-      btn.dataset.bound = "1";
-    }
-  })();
-
-  // Ganz wichtig: Globale Pointer-Blocker auf Canvas beschränken!
-  // Falls du sowas hast wie:
-  // document.addEventListener('touchmove', e => e.preventDefault(), {passive:false})
-  // dann NUR auf die Canvas/Stage registrieren – nie global auf document/body.
-</script>
-
     </script>
 </body>
 </html>
-
-
-
-
-
-
