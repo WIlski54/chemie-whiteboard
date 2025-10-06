@@ -640,6 +640,28 @@
 }
 /* Debugrahmen: kurz aktiv lassen, um Sichtbarkeit zu prüfen */
 /* .users-sidebar{ outline:3px solid #ef4444; } */
+/* iPad: Login muss ganz oben liegen und Events annehmen */
+.login-screen,
+.login-container,
+.tab-content,
+.btn-primary {
+  position: relative;
+  z-index: 1000;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation; /* vermeidet 300ms Delay/Zoom */
+}
+
+/* Versteckte Overlays dürfen niemals Events abfangen */
+.hidden { display: none !important; }
+.modal-overlay.hidden,
+#clearModal.hidden {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* Solange die App nicht aktiv ist, fängt sie keine Events ab */
+.app:not(.active) { pointer-events: none; }
 
     </style>
 </head>
@@ -2113,6 +2135,7 @@ async exportToPDF(mode = 'fit') {
     </script>
 </body>
 </html>
+
 
 
 
