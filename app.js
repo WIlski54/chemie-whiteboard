@@ -1161,8 +1161,6 @@ const app = {
                 <div class="item ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}"
                      style="left: ${absoluteX - size/2}px; top: ${absoluteY - size/2}px; width: ${size}px; height: ${size}px;"
                      data-id="${item.id}"
-                     onmousedown="app.startDrag(event, ${item.id})"
-                     ontouchstart="app.startDrag(event, ${item.id})">
                     <div class="item-content" style="transform: rotate(${item.rotation}deg);">
                         ${equipment.img || equipment.svg}
                     </div>
@@ -1330,3 +1328,4 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     console.log('📱 iOS Device erkannt - aktiviere Touch-Fixes');
     document.addEventListener('touchstart', function(){}, {passive: true});
 }
+
