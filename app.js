@@ -816,49 +816,49 @@ const app = {
         }
     },
 
-    startDrag(e, itemId) {
-        e.stopPropagation();
+  handleStart(e) {
+    // Verhindert Scrollen auf dem iPad
+    if (e.type === 'touchstart') {
         e.preventDefault();
-        
-        const item = this.state.placedItems.find(i => i.id === itemId);
-        if (!item) return;
+    }
 
-        const canvas = document.getElementById('canvas');
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
-        const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
+    const targetItem = e.target.closest('.item');
+    const targetResizeHandle = e.target.closest('.resize-handle');
+    
+    if (!targetItem) return;
 
-        // Konvertiere zu relativen Koordinaten
-        const relX = x / rect.width;
-        const relY = y / rect.height;
+    const itemId = parseInt(targetItem.dataset.id);
+    const item = this.state.placedItems.find(i => i.id === itemId);
+    if (!item) return;
 
-        this.state.selectedItem = item;
-        this.state.isDragging = true;
-        this.state.dragOffset = { 
-            x: relX - item.x, 
-            y: relY - item.y 
-        };
-        this.updateUI();
-    },
+    const canvas = document.getElementById('canvas');
+    const rect = canvas.getBoundingClientRect();
+    
+    // Normalisiert die Koordinaten für Maus und Touch
+    const clientX = e.clientX || e.touches[0].clientX;
+    const clientY = e.clientY || e.touches[0].clientY;
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
 
-    startResize(e, itemId) {
-        e.stopPropagation();
-        e.preventDefault();
-        
-        const item = this.state.placedItems.find(i => i.id === itemId);
-        if (!item) return;
+    this.state.selectedItem = item;
 
-        const canvas = document.getElementById('canvas');
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
-        const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
-
-        this.state.selectedItem = item;
+    if (targetResizeHandle) {
+        // RESIZE STARTEN
         this.state.isResizing = true;
         this.state.initialScale = item.scale || 1;
-        this.state.resizeStartPos = { x, y };  // Bleibt absolut für Delta-Berechnung
-        this.updateUI();
-    },
+        this.state.resizeStartPos = { x, y };
+    } else {
+        // DRAG STARTEN
+        const relX = x / rect.width;
+        const relY = y / rect.height;
+        this.state.isDragging = true;
+        this.state.dragOffset = {
+            x: relX - item.x,
+            y: relY - item.y
+        };
+    }
+    this.updateUI();
+},
 
     handleMove(e) {
         if ((!this.state.isDragging && !this.state.isResizing) || !this.state.selectedItem) return;
@@ -1335,5 +1335,6 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     console.log('📱 iOS Device erkannt - aktiviere Touch-Fixes');
     document.addEventListener('touchstart', function(){}, {passive: true});
 }
+
 
 
