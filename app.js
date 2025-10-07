@@ -704,23 +704,30 @@ const app = {
     },
 
     setupEventListeners() {
-        const canvas = document.getElementById('canvas');
-        const fileInput = document.getElementById('fileInput');
+    const canvas = document.getElementById('canvas');
+    const fileInput = document.getElementById('fileInput');
 
-        canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
-        canvas.addEventListener('touchstart', (e) => this.handleCanvasClick(e));
-        
-        document.addEventListener('mousemove', (e) => this.handleMove(e));
-        document.addEventListener('touchmove', (e) => this.handleMove(e), { passive: false });
-        document.addEventListener('mouseup', () => this.handleEnd());
-        document.addEventListener('touchend', () => this.handleEnd());
+    // Alte Listener für Klick/Touch auf leere Fläche
+    canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
+    canvas.addEventListener('touchstart', (e) => this.handleCanvasClick(e));
 
-        fileInput.addEventListener('change', (e) => this.loadSetup(e));
+    // NEU: Zentrale Listener für Drag & Resize an den Items
+    canvas.addEventListener('mousedown', (e) => this.handleStart(e));
+    canvas.addEventListener('touchstart', (e) => this.handleStart(e), { passive: false });
 
-        document.getElementById('labelInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.saveLabel();
-        });
-    },
+    // Globale Listener für das Bewegen und Loslassen
+    document.addEventListener('mousemove', (e) => this.handleMove(e));
+    document.addEventListener('touchmove', (e) => this.handleMove(e), { passive: false });
+
+    document.addEventListener('mouseup', () => this.handleEnd());
+    document.addEventListener('touchend', () => this.handleEnd());
+
+    // Bestehende Listener
+    fileInput.addEventListener('change', (e) => this.loadSetup(e));
+    document.getElementById('labelInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') this.saveLabel();
+    });
+},
 
     selectTool(id) {
         console.log('🔧 Tool ausgewählt:', id);
@@ -1328,4 +1335,5 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     console.log('📱 iOS Device erkannt - aktiviere Touch-Fixes');
     document.addEventListener('touchstart', function(){}, {passive: true});
 }
+
 
