@@ -760,6 +760,7 @@ const app = {
             } else if (item) {
                 this.state.selectedItem = item;
                 this.state.selectedTool = null;
+                this.render();
                 this.updateUI();
             }
         } else if (this.state.selectedTool) {
@@ -1336,6 +1337,7 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     console.log('📱 iOS Device erkannt - aktiviere Touch-Fixes');
     document.addEventListener('touchstart', function(){}, {passive: true});
 }
+
 
 
 
