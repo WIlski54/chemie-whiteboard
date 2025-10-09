@@ -134,7 +134,7 @@ async function joinRoom(event) {
             sessionData.userColor = data.user_color || '#2563eb';
             
             if (data.room_state) {
-                console.log('📥 Lade initialen Raum-State:', data.room_state);
+                console.log('🔥 Lade initialen Raum-State:', data.room_state);
                 app.state.placedItems = data.room_state.items || [];
                 app.state.connections = data.room_state.connections || [];
             }
@@ -704,30 +704,30 @@ const app = {
     },
 
     setupEventListeners() {
-    const canvas = document.getElementById('canvas');
-    const fileInput = document.getElementById('fileInput');
+        const canvas = document.getElementById('canvas');
+        const fileInput = document.getElementById('fileInput');
 
-    // Alte Listener für Klick/Touch auf leere Fläche
-    canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
-    canvas.addEventListener('touchstart', (e) => this.handleCanvasClick(e));
+        // Alte Listener für Klick/Touch auf leere Fläche
+        canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
+        canvas.addEventListener('touchstart', (e) => this.handleCanvasClick(e));
 
-    // NEU: Zentrale Listener für Drag & Resize an den Items
-    canvas.addEventListener('mousedown', (e) => this.handleStart(e));
-    canvas.addEventListener('touchstart', (e) => this.handleStart(e), { passive: false });
+        // NEU: Zentrale Listener für Drag & Resize an den Items
+        canvas.addEventListener('mousedown', (e) => this.handleStart(e));
+        canvas.addEventListener('touchstart', (e) => this.handleStart(e), { passive: false });
 
-    // Globale Listener für das Bewegen und Loslassen
-    document.addEventListener('mousemove', (e) => this.handleMove(e));
-    document.addEventListener('touchmove', (e) => this.handleMove(e), { passive: false });
+        // Globale Listener für das Bewegen und Loslassen
+        document.addEventListener('mousemove', (e) => this.handleMove(e));
+        document.addEventListener('touchmove', (e) => this.handleMove(e), { passive: false });
 
-    document.addEventListener('mouseup', () => this.handleEnd());
-    document.addEventListener('touchend', () => this.handleEnd());
+        document.addEventListener('mouseup', () => this.handleEnd());
+        document.addEventListener('touchend', () => this.handleEnd());
 
-    // Bestehende Listener
-    fileInput.addEventListener('change', (e) => this.loadSetup(e));
-    document.getElementById('labelInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') this.saveLabel();
-    });
-},
+        // Bestehende Listener
+        fileInput.addEventListener('change', (e) => this.loadSetup(e));
+        document.getElementById('labelInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.saveLabel();
+        });
+    },
 
     selectTool(id) {
         console.log('🔧 Tool ausgewählt:', id);
@@ -817,50 +817,49 @@ const app = {
         }
     },
 
-  handleStart(e) {
-    // Verhindert Scrollen auf dem iPad
-    if (e.type === 'touchstart') {
-        e.preventDefault();
-    }
+    handleStart(e) {
+        // Verhindert Scrollen auf dem iPad
+        if (e.type === 'touchstart') {
+            e.preventDefault();
+        }
 
-    const targetItem = e.target.closest('.item');
-    const targetResizeHandle = e.target.closest('.resize-handle');
-    
-    if (!targetItem) return;
+        const targetItem = e.target.closest('.item');
+        const targetResizeHandle = e.target.closest('.resize-handle');
+        
+        if (!targetItem) return;
 
-    const itemId = parseInt(targetItem.dataset.id);
-    const item = this.state.placedItems.find(i => i.id === itemId);
-    if (!item) return;
+        const itemId = parseInt(targetItem.dataset.id);
+        const item = this.state.placedItems.find(i => i.id === itemId);
+        if (!item) return;
 
-    const canvas = document.getElementById('canvas');
-    const rect = canvas.getBoundingClientRect();
-    
-    // Normalisiert die Koordinaten für Maus und Touch
-    const clientX = e.clientX || e.touches[0].clientX;
-    const clientY = e.clientY || e.touches[0].clientY;
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+        const canvas = document.getElementById('canvas');
+        const rect = canvas.getBoundingClientRect();
+        
+        // Normalisiert die Koordinaten für Maus und Touch
+        const clientX = e.clientX || e.touches[0].clientX;
+        const clientY = e.clientY || e.touches[0].clientY;
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
 
-    this.state.selectedItem = item;
+        this.state.selectedItem = item;
 
-    if (targetResizeHandle) {
-        // RESIZE STARTEN
-        this.state.isResizing = true;
-        this.state.initialScale = item.scale || 1;
-        this.state.resizeStartPos = { x, y };
-    } else {
-        // DRAG STARTEN
-        const relX = x / rect.width;
-        const relY = y / rect.height;
-        this.state.isDragging = true;
-        this.state.dragOffset = {
-            x: relX - item.x,
-            y: relY - item.y
-        };
-    }
-      this.updateUI();
-      this.updateUI();
-},
+        if (targetResizeHandle) {
+            // RESIZE STARTEN
+            this.state.isResizing = true;
+            this.state.initialScale = item.scale || 1;
+            this.state.resizeStartPos = { x, y };
+        } else {
+            // DRAG STARTEN
+            const relX = x / rect.width;
+            const relY = y / rect.height;
+            this.state.isDragging = true;
+            this.state.dragOffset = {
+                x: relX - item.x,
+                y: relY - item.y
+            };
+        }
+        this.updateUI();
+    },
 
     handleMove(e) {
         if ((!this.state.isDragging && !this.state.isResizing) || !this.state.selectedItem) return;
@@ -1169,14 +1168,12 @@ const app = {
             return `
                 <div class="item ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}"
                      style="left: ${absoluteX - size/2}px; top: ${absoluteY - size/2}px; width: ${size}px; height: ${size}px;"
-                     data-id="${item.id}"
+                     data-id="${item.id}">
                     <div class="item-content" style="transform: rotate(${item.rotation}deg);">
                         ${equipment.img || equipment.svg}
                     </div>
                     ${isSelected ? `
-                        <div class="resize-handle"
-                             onmousedown="app.startResize(event, ${item.id})"
-                             ontouchstart="app.startResize(event, ${item.id})">
+                        <div class="resize-handle">
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="white">
                                 <path d="M14 2L2 14M14 8L8 14" stroke="white" stroke-width="2" stroke-linecap="round"/>
                             </svg>
@@ -1337,8 +1334,3 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     console.log('📱 iOS Device erkannt - aktiviere Touch-Fixes');
     document.addEventListener('touchstart', function(){}, {passive: true});
 }
-
-
-
-
-
