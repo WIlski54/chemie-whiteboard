@@ -629,6 +629,7 @@ function logoutAdmin() {
 }
 
 // Whiteboard App
+// Whiteboard App mit iPad-Touch-Fixes
 const app = {
     state: {
         selectedTool: null,
@@ -642,7 +643,10 @@ const app = {
         dragOffset: { x: 0, y: 0 },
         initialScale: 1,
         resizeStartPos: { x: 0, y: 0 },
-        isExporting: false
+        isExporting: false,
+        hadInteraction: false,  // NEU: Track ob Drag/Resize stattfand
+        renderScheduled: false,  // NEU: Verhindert zu viele Render-Calls
+        touchStartTime: 0  // NEU: Für Click-Detection bei Touch
     },
 
     equipment: [
@@ -707,22 +711,31 @@ const app = {
         const canvas = document.getElementById('canvas');
         const fileInput = document.getElementById('fileInput');
 
-        // Alte Listener für Klick/Touch auf leere Fläche
-        canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
-        canvas.addEventListener('touchstart', (e) => this.handleCanvasClick(e));
+        // Desktop Click-Event (nur wenn KEINE Touch-Interaktion stattfand)
+        canvas.addEventListener('click', (e) => {
+            if (!this.state.hadInteraction) {
+                this.handleCanvasClick(e);
+            }
+        });
 
-        // NEU: Zentrale Listener für Drag & Resize an den Items
+        // Mouse Events
         canvas.addEventListener('mousedown', (e) => this.handleStart(e));
-        canvas.addEventListener('touchstart', (e) => this.handleStart(e), { passive: false });
+        
+        // Touch Events - NUR EINMAL!
+        canvas.addEventListener('touchstart', (e) => {
+            this.handleStart(e);
+        }, { passive: false });
 
-        // Globale Listener für das Bewegen und Loslassen
+        // Globale Move-Listener
         document.addEventListener('mousemove', (e) => this.handleMove(e));
         document.addEventListener('touchmove', (e) => this.handleMove(e), { passive: false });
 
-        document.addEventListener('mouseup', () => this.handleEnd());
-        document.addEventListener('touchend', () => this.handleEnd());
+        // Globale End-Listener
+        document.addEventListener('mouseup', (e) => this.handleEnd(e));
+        document.addEventListener('touchend', (e) => this.handleEnd(e));
+        document.addEventListener('touchcancel', (e) => this.handleEnd(e));
 
-        // Bestehende Listener
+        // File Input
         fileInput.addEventListener('change', (e) => this.loadSetup(e));
         document.getElementById('labelInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.saveLabel();
@@ -764,7 +777,6 @@ const app = {
                 this.updateUI();
             }
         } else if (this.state.selectedTool) {
-            // Konvertiere absolute Pixel zu relativen Koordinaten (0-1)
             const relativeX = x / rect.width;
             const relativeY = y / rect.height;
             this.placeItem(relativeX, relativeY);
@@ -780,8 +792,8 @@ const app = {
         const newItem = {
             id: Date.now(),
             type: this.state.selectedTool,
-            x: relX,  // Relative Koordinaten 0-1
-            y: relY,  // Relative Koordinaten 0-1
+            x: relX,
+            y: relY,
             rotation: 0,
             scale: 1,
             label: ''
@@ -818,15 +830,37 @@ const app = {
     },
 
     handleStart(e) {
-        // Verhindert Scrollen auf dem iPad
+        // Reset Interaction-Flag
+        this.state.hadInteraction = false;
+        this.state.touchStartTime = Date.now();
+        
+        // Verhindere Default bei Touch
         if (e.type === 'touchstart') {
             e.preventDefault();
+            e.stopPropagation();
         }
 
         const targetItem = e.target.closest('.item');
         const targetResizeHandle = e.target.closest('.resize-handle');
         
-        if (!targetItem) return;
+        if (!targetItem) {
+            // Klick auf leere Fläche
+            if (this.state.selectedTool) {
+                // Tool platzieren
+                const canvas = document.getElementById('canvas');
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+                const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+                const x = clientX - rect.left;
+                const y = clientY - rect.top;
+                
+                const relativeX = x / rect.width;
+                const relativeY = y / rect.height;
+                this.placeItem(relativeX, relativeY);
+                this.state.hadInteraction = true;
+            }
+            return;
+        }
 
         const itemId = parseInt(targetItem.dataset.id);
         const item = this.state.placedItems.find(i => i.id === itemId);
@@ -835,21 +869,23 @@ const app = {
         const canvas = document.getElementById('canvas');
         const rect = canvas.getBoundingClientRect();
         
-        // Normalisiert die Koordinaten für Maus und Touch
-        const clientX = e.clientX || e.touches[0].clientX;
-        const clientY = e.clientY || e.touches[0].clientY;
+        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+        const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
         const x = clientX - rect.left;
         const y = clientY - rect.top;
 
         this.state.selectedItem = item;
+        this.state.hadInteraction = true;
 
         if (targetResizeHandle) {
             // RESIZE STARTEN
+            console.log('🔧 Resize gestartet');
             this.state.isResizing = true;
             this.state.initialScale = item.scale || 1;
             this.state.resizeStartPos = { x, y };
         } else {
             // DRAG STARTEN
+            console.log('👆 Drag gestartet');
             const relX = x / rect.width;
             const relY = y / rect.height;
             this.state.isDragging = true;
@@ -864,36 +900,56 @@ const app = {
     handleMove(e) {
         if ((!this.state.isDragging && !this.state.isResizing) || !this.state.selectedItem) return;
 
-        const canvas = document.getElementById('canvas');
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
-        const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
+        this.state.hadInteraction = true;
 
-        if (this.state.isResizing) {
-            e.preventDefault();
-            // Resizing bleibt gleich - arbeitet mit absoluten Pixeln für Delta
-            const deltaX = x - (this.state.resizeStartPos.x || 0);
-            const deltaY = y - (this.state.resizeStartPos.y || 0);
-            const delta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            const direction = (deltaX + deltaY) > 0 ? 1 : -1;
-            const scaleFactor = 1 + (direction * delta * 0.003);
-            let newScale = this.state.initialScale * scaleFactor;
-            newScale = Math.max(0.5, Math.min(3, newScale));
-            this.state.selectedItem.scale = newScale;
-        } else if (this.state.isDragging) {
-            e.preventDefault();
-            // Konvertiere zu relativen Koordinaten
-            const relX = x / rect.width;
-            const relY = y / rect.height;
-            this.state.selectedItem.x = Math.max(0, Math.min(1, relX - this.state.dragOffset.x));
-            this.state.selectedItem.y = Math.max(0, Math.min(1, relY - this.state.dragOffset.y));
-        }
+        // Performance-Optimierung: Throttle mit requestAnimationFrame
+        if (this.state.renderScheduled) return;
+        this.state.renderScheduled = true;
 
-        this.render();
-        this.updateUI();
+        requestAnimationFrame(() => {
+            const canvas = document.getElementById('canvas');
+            const rect = canvas.getBoundingClientRect();
+            
+            // Verbesserte Touch-Koordinaten-Behandlung
+            let x, y;
+            if (e.type.startsWith('touch')) {
+                if (e.touches && e.touches.length > 0) {
+                    x = e.touches[0].clientX - rect.left;
+                    y = e.touches[0].clientY - rect.top;
+                } else {
+                    this.state.renderScheduled = false;
+                    return;
+                }
+            } else {
+                x = e.clientX - rect.left;
+                y = e.clientY - rect.top;
+            }
+
+            if (this.state.isResizing) {
+                const deltaX = x - (this.state.resizeStartPos.x || 0);
+                const deltaY = y - (this.state.resizeStartPos.y || 0);
+                const delta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                const direction = (deltaX + deltaY) > 0 ? 1 : -1;
+                const scaleFactor = 1 + (direction * delta * 0.003);
+                let newScale = this.state.initialScale * scaleFactor;
+                newScale = Math.max(0.5, Math.min(3, newScale));
+                this.state.selectedItem.scale = newScale;
+            } else if (this.state.isDragging) {
+                const relX = x / rect.width;
+                const relY = y / rect.height;
+                this.state.selectedItem.x = Math.max(0, Math.min(1, relX - this.state.dragOffset.x));
+                this.state.selectedItem.y = Math.max(0, Math.min(1, relY - this.state.dragOffset.y));
+            }
+
+            this.render();
+            this.updateUI();
+            this.state.renderScheduled = false;
+        });
     },
 
-    handleEnd() {
+    handleEnd(e) {
+        const touchDuration = Date.now() - this.state.touchStartTime;
+        
         if (this.state.isDragging || this.state.isResizing) {
             console.log('📤 Sende Update nach Drag/Resize');
             const equipment = this.equipment.find(e => e.id === this.state.selectedItem?.type);
@@ -904,11 +960,34 @@ const app = {
             }
             sendUpdate();
         }
+        
         this.state.isDragging = false;
         this.state.isResizing = false;
+        this.state.renderScheduled = false;
+        
+        // Kurzer Tap ohne Bewegung = Click-Verhalten für Touch
+        if (e.type.startsWith('touch') && touchDuration < 200 && !this.state.hadInteraction) {
+            const targetItem = e.target.closest('.item');
+            if (targetItem) {
+                const itemId = parseInt(targetItem.dataset.id);
+                const item = this.state.placedItems.find(i => i.id === itemId);
+                
+                if (this.state.connectionMode && item) {
+                    this.handleConnection(item);
+                    this.state.hadInteraction = true;
+                }
+            }
+        }
+        
+        // Verzögertes Zurücksetzen des Interaction-Flags
+        setTimeout(() => {
+            this.state.hadInteraction = false;
+        }, 50);
+        
         this.updateUI();
     },
 
+    // Rest der Methoden bleiben unverändert...
     rotateItem() {
         if (!this.state.selectedItem) return;
         console.log('🔄 Drehe Item:', this.state.selectedItem.type);
@@ -1157,11 +1236,8 @@ const app = {
             if (!equipment) return '';
             
             const size = 80 * (item.scale || 1);
-            
-            // Konvertiere relative (0-1) zu absolute Pixel-Koordinaten
             const absoluteX = item.x * canvasWidth;
             const absoluteY = item.y * canvasHeight;
-            
             const isSelected = this.state.selectedItem?.id === item.id;
             const isDragging = this.state.isDragging && isSelected;
             
@@ -1197,7 +1273,6 @@ const app = {
             
             if (!fromItem || !toItem) return '';
             
-            // Konvertiere relative zu absoluten Koordinaten
             const fromX = fromItem.x * canvasWidth;
             const fromY = fromItem.y * canvasHeight;
             const toX = toItem.x * canvasWidth;
@@ -1334,3 +1409,4 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     console.log('📱 iOS Device erkannt - aktiviere Touch-Fixes');
     document.addEventListener('touchstart', function(){}, {passive: true});
 }
+
