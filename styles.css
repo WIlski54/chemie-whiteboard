@@ -359,6 +359,7 @@ body {
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
+    touch-action: none;
 }
 
 /* Item Styling - Touch-optimiert */
@@ -673,4 +674,5 @@ body {
         right: -10px;
     }
 }
+
 
