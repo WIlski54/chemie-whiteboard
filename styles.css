@@ -388,12 +388,13 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    pointer-events: none; /* Verhindert dass Bilder Events abfangen */
+    pointer-events: auto;  
+    touch-action: none;  
 }
 
 /* WICHTIG: Bilder im Item dürfen keine Touch-Events abfangen */
 .item-content img {
-    pointer-events: none;
+    pointer-events: auto;
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
@@ -672,3 +673,4 @@ body {
         right: -10px;
     }
 }
+
