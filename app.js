@@ -963,6 +963,10 @@ const app = {
 },
 
     handleEnd(e) {
+        if (e.type && e.type.startsWith('touch')) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
         const touchDuration = Date.now() - this.state.touchStartTime;
         
         if (this.state.isDragging || this.state.isResizing) {
@@ -1424,6 +1428,7 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     console.log('📱 iOS Device erkannt - aktiviere Touch-Fixes');
     document.addEventListener('touchstart', function(){}, {passive: true});
 }
+
 
 
 
