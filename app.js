@@ -906,55 +906,61 @@ const app = {
     this.updateUI();
 },
 
-    handleMove(e) {
-        if ((!this.state.isDragging && !this.state.isResizing) || !this.state.selectedItem) return;
+   handleMove(e) {
+  // iPad-Safari: Scroll/Pinch sicher unterbinden, bevor irgendetwas anderes passiert
+  if (e.type && e.type.startsWith('touch')) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
 
-        this.state.hadInteraction = true;
+  if ((!this.state.isDragging && !this.state.isResizing) || !this.state.selectedItem) return;
 
-        // Performance-Optimierung: Throttle mit requestAnimationFrame
-        if (this.state.renderScheduled) return;
-        this.state.renderScheduled = true;
+  this.state.hadInteraction = true;
 
-        requestAnimationFrame(() => {
-            const canvas = document.getElementById('canvas');
-            const rect = canvas.getBoundingClientRect();
-            
-            // Verbesserte Touch-Koordinaten-Behandlung
-            let x, y;
-            if (e.type.startsWith('touch')) {
-                if (e.touches && e.touches.length > 0) {
-                    x = e.touches[0].clientX - rect.left;
-                    y = e.touches[0].clientY - rect.top;
-                } else {
-                    this.state.renderScheduled = false;
-                    return;
-                }
-            } else {
-                x = e.clientX - rect.left;
-                y = e.clientY - rect.top;
-            }
+  // Performance-Optimierung: Throttle mit requestAnimationFrame
+  if (this.state.renderScheduled) return;
+  this.state.renderScheduled = true;
 
-            if (this.state.isResizing) {
-                const deltaX = x - (this.state.resizeStartPos.x || 0);
-                const deltaY = y - (this.state.resizeStartPos.y || 0);
-                const delta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-                const direction = (deltaX + deltaY) > 0 ? 1 : -1;
-                const scaleFactor = 1 + (direction * delta * 0.003);
-                let newScale = this.state.initialScale * scaleFactor;
-                newScale = Math.max(0.5, Math.min(3, newScale));
-                this.state.selectedItem.scale = newScale;
-            } else if (this.state.isDragging) {
-                const relX = x / rect.width;
-                const relY = y / rect.height;
-                this.state.selectedItem.x = Math.max(0, Math.min(1, relX - this.state.dragOffset.x));
-                this.state.selectedItem.y = Math.max(0, Math.min(1, relY - this.state.dragOffset.y));
-            }
+  requestAnimationFrame(() => {
+    const canvas = document.getElementById('canvas');
+    const rect = canvas.getBoundingClientRect();
 
-            this.render();
-            this.updateUI();
-            this.state.renderScheduled = false;
-        });
-    },
+    // Verbesserte Touch-/Maus-Koordinaten
+    let x, y;
+    if (e.type && e.type.startsWith('touch')) {
+      if (e.touches && e.touches.length > 0) {
+        x = e.touches[0].clientX - rect.left;
+        y = e.touches[0].clientY - rect.top;
+      } else {
+        this.state.renderScheduled = false;
+        return;
+      }
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
+
+    if (this.state.isResizing) {
+      const deltaX = x - (this.state.resizeStartPos.x || 0);
+      const deltaY = y - (this.state.resizeStartPos.y || 0);
+      const delta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      const direction = (deltaX + deltaY) > 0 ? 1 : -1;
+      const scaleFactor = 1 + (direction * delta * 0.003);
+      let newScale = this.state.initialScale * scaleFactor;
+      newScale = Math.max(0.5, Math.min(3, newScale));
+      this.state.selectedItem.scale = newScale;
+    } else if (this.state.isDragging) {
+      const relX = x / rect.width;
+      const relY = y / rect.height;
+      this.state.selectedItem.x = Math.max(0, Math.min(1, relX - this.state.dragOffset.x));
+      this.state.selectedItem.y = Math.max(0, Math.min(1, relY - this.state.dragOffset.y));
+    }
+
+    this.render();
+    this.updateUI();
+    this.state.renderScheduled = false;
+  });
+},
 
     handleEnd(e) {
         const touchDuration = Date.now() - this.state.touchStartTime;
@@ -1418,5 +1424,6 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     console.log('📱 iOS Device erkannt - aktiviere Touch-Fixes');
     document.addEventListener('touchstart', function(){}, {passive: true});
 }
+
 
 
