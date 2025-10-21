@@ -526,7 +526,7 @@ function displayAdminRooms(rooms) {
                     </div>
                 </div>
                 
-                ${room.users.length > 1 ? `
+                ${room.users.length > 0 ? `
                     <details style="margin-bottom: 1rem;">
                         <summary style="cursor: pointer; color: #2563eb; font-weight: 500; padding: 0.5rem;">
                             👥 ${room.users.length} Nutzer anzeigen
@@ -644,9 +644,9 @@ const app = {
         initialScale: 1,
         resizeStartPos: { x: 0, y: 0 },
         isExporting: false,
-        hadInteraction: false,  // Track ob Drag/Resize stattfand
-        renderScheduled: false, // Verhindert zu viele Render-Calls
-        touchStartTime: 0       // Für Click-Detection bei Touch
+        hadInteraction: false,  // NEU: Track ob Drag/Resize stattfand
+        renderScheduled: false,  // NEU: Verhindert zu viele Render-Calls
+        touchStartTime: 0  // NEU: Für Click-Detection bei Touch
     },
 
     equipment: [
@@ -829,156 +829,144 @@ const app = {
         }
     },
 
-    handleStart(e) {
-        // Reset Interaction-Flag
-        this.state.hadInteraction = false;
-        this.state.touchStartTime = Date.now();
-        
-        // Verhindere Default bei Touch
-        if (e.type === 'touchstart') {
-            e.preventDefault();
-            e.stopPropagation();
-            // Mehrfinger-Gesten: keine Objektmanipulation starten
-            if (e.touches && e.touches.length > 1) {
-                return;
-            }
-        }
+   handleStart(e) {
+    // Reset Interaction-Flag
+    this.state.hadInteraction = false;
+    this.state.touchStartTime = Date.now();
+    
+    // Verhindere Default bei Touch
+    if (e.type === 'touchstart') {
+        e.preventDefault();
+        e.stopPropagation();
+    }
 
-        const targetItem = e.target.closest('.item');
-        const targetResizeHandle = e.target.closest('.resize-handle');
-        
-        if (!targetItem) {
-            // Klick auf leere Fläche
-            const canvas = document.getElementById('canvas');
-            const rect = canvas.getBoundingClientRect();
-            const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-            const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
-            const x = clientX - rect.left;
-            const y = clientY - rect.top;
-            
-            if (this.state.selectedTool) {
-                // Tool platzieren
-                const relativeX = x / rect.width;
-                const relativeY = y / rect.height;
-                this.placeItem(relativeX, relativeY);
-                this.state.hadInteraction = true;
-            } else {
-                // Objekt abwählen, wenn auf leere Fläche getippt
-                if (this.state.selectedItem) {
-                    console.log('🔄 Objekt abgewählt');
-                    this.state.selectedItem = null;
-                    this.render();
-                    this.updateUI();
-                    this.state.hadInteraction = true;
-                }
-            }
-            return;
-        }
-
-        const itemId = parseInt(targetItem.dataset.id);
-        const item = this.state.placedItems.find(i => i.id === itemId);
-        if (!item) return;
-
+    const targetItem = e.target.closest('.item');
+    const targetResizeHandle = e.target.closest('.resize-handle');
+    
+    if (!targetItem) {
+        // Klick auf leere Fläche
         const canvas = document.getElementById('canvas');
         const rect = canvas.getBoundingClientRect();
-        
         const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
         const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
         const x = clientX - rect.left;
         const y = clientY - rect.top;
-
-        this.state.selectedItem = item;
-        this.state.hadInteraction = true;
-
-        if (targetResizeHandle) {
-            // RESIZE STARTEN
-            console.log('🔧 Resize gestartet');
-            this.state.isResizing = true;
-            this.state.initialScale = item.scale || 1;
-            this.state.resizeStartPos = { x, y };
+        
+        if (this.state.selectedTool) {
+            // Tool platzieren
+            const relativeX = x / rect.width;
+            const relativeY = y / rect.height;
+            this.placeItem(relativeX, relativeY);
+            this.state.hadInteraction = true;
         } else {
-            // DRAG STARTEN
-            console.log('👆 Drag gestartet');
-            const relX = x / rect.width;
-            const relY = y / rect.height;
-            this.state.isDragging = true;
-            this.state.dragOffset = {
-                x: relX - item.x,
-                y: relY - item.y
-            };
-        }
-        this.updateUI();
-    },
-
-    handleMove(e) {
-        // iPad-Safari: Scroll/Pinch sicher unterbinden
-        if (e.type && e.type.startsWith('touch')) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        if ((!this.state.isDragging && !this.state.isResizing) || !this.state.selectedItem) return;
-
-        this.state.hadInteraction = true;
-
-        // Throttle via rAF
-        if (this.state.renderScheduled) return;
-        this.state.renderScheduled = true;
-
-        requestAnimationFrame(() => {
-            const canvas = document.getElementById('canvas');
-            const rect = canvas.getBoundingClientRect();
-
-            // Koordinaten bestimmen
-            let x, y;
-            if (e.type && e.type.startsWith('touch')) {
-                if (e.touches && e.touches.length > 0) {
-                    x = e.touches[0].clientX - rect.left;
-                    y = e.touches[0].clientY - rect.top;
-                } else {
-                    this.state.renderScheduled = false;
-                    return;
-                }
-            } else {
-                x = e.clientX - rect.left;
-                y = e.clientY - rect.top;
-            }
-
-            if (this.state.isResizing) {
-                const deltaX = x - (this.state.resizeStartPos.x || 0);
-                const deltaY = y - (this.state.resizeStartPos.y || 0);
-                const delta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-                const direction = (deltaX + deltaY) > 0 ? 1 : -1;
-
-                // Sanfte Skalierung
-                const sensitivity = 0.004;
-                let newScale = this.state.initialScale + direction * delta * sensitivity;
-                newScale = Math.max(0.3, Math.min(3, newScale));
-                this.state.selectedItem.scale = newScale;
-            } else if (this.state.isDragging) {
-                // Dragging
-                const relX = x / rect.width;
-                const relY = y / rect.height;
-                this.state.selectedItem.x = Math.max(0, Math.min(1, relX - this.state.dragOffset.x));
-                this.state.selectedItem.y = Math.max(0, Math.min(1, relY - this.state.dragOffset.y));
-            }
-
-            // *** iPad-Optimierung: Mikro-Render statt Full-Render während der Geste ***
-            if (this.state.isDragging || this.state.isResizing) {
-                this.updateActiveItemDom(rect);
-            } else {
+            // WICHTIG: Objekt abwählen wenn auf leere Fläche geklickt wird
+            if (this.state.selectedItem) {
+                console.log('🔄 Objekt abgewählt');
+                this.state.selectedItem = null;
                 this.render();
+                this.updateUI();
+                this.state.hadInteraction = true;
             }
-            this.updateUI();
-            this.state.renderScheduled = false;
-        });
-    },
+        }
+        return;
+    }
+
+    const itemId = parseInt(targetItem.dataset.id);
+    const item = this.state.placedItems.find(i => i.id === itemId);
+    if (!item) return;
+
+    const canvas = document.getElementById('canvas');
+    const rect = canvas.getBoundingClientRect();
+    
+    const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+    const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    this.state.selectedItem = item;
+    this.state.hadInteraction = true;
+
+    if (targetResizeHandle) {
+        // RESIZE STARTEN
+        console.log('🔧 Resize gestartet');
+        this.state.isResizing = true;
+        this.state.initialScale = item.scale || 1;
+        this.state.resizeStartPos = { x, y };
+    } else {
+        // DRAG STARTEN
+        console.log('👆 Drag gestartet');
+        const relX = x / rect.width;
+        const relY = y / rect.height;
+        this.state.isDragging = true;
+        this.state.dragOffset = {
+            x: relX - item.x,
+            y: relY - item.y
+        };
+    }
+    this.updateUI();
+},
+
+   handleMove(e) {
+  // iPad-Safari: Scroll/Pinch sicher unterbinden, bevor irgendetwas anderes passiert
+  if (e.type && e.type.startsWith('touch')) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  if ((!this.state.isDragging && !this.state.isResizing) || !this.state.selectedItem) return;
+
+  this.state.hadInteraction = true;
+
+  // Performance-Optimierung: Throttle mit requestAnimationFrame
+  if (this.state.renderScheduled) return;
+  this.state.renderScheduled = true;
+
+  requestAnimationFrame(() => {
+    const canvas = document.getElementById('canvas');
+    const rect = canvas.getBoundingClientRect();
+
+    // Verbesserte Touch-/Maus-Koordinaten
+    let x, y;
+    if (e.type && e.type.startsWith('touch')) {
+      if (e.touches && e.touches.length > 0) {
+        x = e.touches[0].clientX - rect.left;
+        y = e.touches[0].clientY - rect.top;
+      } else {
+        this.state.renderScheduled = false;
+        return;
+      }
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
+
+    if (this.state.isResizing) {
+      const deltaX = x - (this.state.resizeStartPos.x || 0);
+      const deltaY = y - (this.state.resizeStartPos.y || 0);
+      const delta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      const direction = (deltaX + deltaY) > 0 ? 1 : -1;
+      const scaleFactor = 1 + (direction * delta * 0.003);
+      let newScale = this.state.initialScale * scaleFactor;
+      newScale = Math.max(0.5, Math.min(3, newScale));
+      this.state.selectedItem.scale = newScale;
+    } else if (this.state.isDragging) {
+      const relX = x / rect.width;
+      const relY = y / rect.height;
+      this.state.selectedItem.x = Math.max(0, Math.min(1, relX - this.state.dragOffset.x));
+      this.state.selectedItem.y = Math.max(0, Math.min(1, relY - this.state.dragOffset.y));
+    }
+
+    this.render();
+    this.updateUI();
+    this.state.renderScheduled = false;
+  });
+},
 
     handleEnd(e) {
         if (e.type && e.type.startsWith('touch')) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
+    e.preventDefault();
+    e.stopPropagation();
+  }
         const touchDuration = Date.now() - this.state.touchStartTime;
         
         if (this.state.isDragging || this.state.isResizing) {
@@ -997,11 +985,12 @@ const app = {
         this.state.renderScheduled = false;
         
         // Kurzer Tap ohne Bewegung = Click-Verhalten für Touch
-        if (e.type && e.type.startsWith('touch') && touchDuration < 200 && !this.state.hadInteraction) {
+        if (e.type.startsWith('touch') && touchDuration < 200 && !this.state.hadInteraction) {
             const targetItem = e.target.closest('.item');
             if (targetItem) {
                 const itemId = parseInt(targetItem.dataset.id);
                 const item = this.state.placedItems.find(i => i.id === itemId);
+                
                 if (this.state.connectionMode && item) {
                     this.handleConnection(item);
                     this.state.hadInteraction = true;
@@ -1013,36 +1002,8 @@ const app = {
         setTimeout(() => {
             this.state.hadInteraction = false;
         }, 50);
-
-        // *** Cleanup & einmaliger Full-Render ***
-        (function(){
-            const container = document.getElementById('itemsContainer');
-            const el = container && app.state.selectedItem
-                ? container.querySelector(`.item[data-id="${app.state.selectedItem.id}"]`)
-                : null;
-            if (el) el.classList.remove('dragging');
-        })();
-        this.render();
+        
         this.updateUI();
-    },
-
-    // === iPad: Mikro-Render des aktiven Items für flüssiges Touch-Dragging ===
-    updateActiveItemDom(rect) {
-        if (!this.state.selectedItem) return;
-        const container = document.getElementById('itemsContainer');
-        const el = container ? container.querySelector(`.item[data-id="${this.state.selectedItem.id}"]`) : null;
-        if (!el) return;
-
-        const size = 80 * (this.state.selectedItem.scale || 1);
-        const absX = this.state.selectedItem.x * rect.width;
-        const absY = this.state.selectedItem.y * rect.height;
-
-        el.style.left = (absX - size / 2) + 'px';
-        el.style.top = (absY - size / 2) + 'px';
-        el.style.width = size + 'px';
-        el.style.height = size + 'px';
-
-        el.classList.add('dragging');
     },
 
     // Rest der Methoden bleiben unverändert...
@@ -1467,3 +1428,7 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     console.log('📱 iOS Device erkannt - aktiviere Touch-Fixes');
     document.addEventListener('touchstart', function(){}, {passive: true});
 }
+
+
+
+
